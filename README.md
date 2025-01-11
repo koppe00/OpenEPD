@@ -1,5 +1,3 @@
-Hier is een voorstel voor een beknopte samenvatting die je in je `README.md` bestand kunt opnemen, **zonder verwijzingen**, zodat je deze makkelijk kunt kopiëren en plakken:
-
 **Project: Open-Source Elektronisch Patiëntendossier (EPD)**
 
 **Introductie:**
