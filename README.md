@@ -41,3 +41,8 @@ We nodigen ontwikkelaars, zorgprofessionals en patiënten uit om bij te dragen a
 
 **Licentie:**
 Dit project is gelicenseerd onder GNU General Public License versie 3 (GPL V3). Zie het `LICENSE` bestand voor meer details.
+
+**meer informatie:**
+Uigebreid conceptueel ontwerp:  https://docs.google.com/document/d/15OIgRELi9W2JiKSvtPuIYkrDO_uVW-5yt_5gboskDFY/edit?usp=drivesdk
+Functionele onderdelen voor een open-source Elektronisch Patiëntendossier (EPD)
+https://docs.google.com/document/d/1jHxhrscqeIHNaKtjN7-xYYRcE04447KPPdBOw3F999I/edit?usp=drivesdk
