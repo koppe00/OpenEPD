@@ -3,26 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* We dwingen hier lichte, frisse kleuren af */
+  --background: #f8fafc; /* Slate-50 (heel lichtgrijs) */
+  --foreground: #0f172a; /* Slate-900 (diep donkerblauw/grijs voor tekst) */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Geen @media (prefers-color-scheme: dark) meer! */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  
+  /* Zorgt voor soepele letters */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

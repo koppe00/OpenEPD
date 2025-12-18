@@ -1,70 +1,58 @@
-// packages/projection-service/project-vitals.ts
-
-import * as dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import * as path from 'path'; // Node.js ingebouwde module
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-// Expliciet de environment variabelen laden vanaf de absolute root.
-// process.cwd() geeft de root van de monorepo, wat de juiste locatie is.
-dotenv.config({ path: path.join(process.cwd(), '.env.local') }); 
+// --- CONFIGURATIE (Zelfde als voorheen) ---
+const envPath = path.resolve(__dirname, '../../.env.local');
+const result = dotenv.config({ path: envPath });
 
-// Configuratie
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_ANON_KEY!;
+if (result.error) {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
 
-// Maak de Supabase client (verbinding met de Query Store)
-// Deze zal nu de geladen URL en Key gebruiken.
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("❌ Geen Supabase keys gevonden.");
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Functie om gedenormaliseerde data op te slaan in de Query Store
-export async function saveVitalsProjection(ehr_id: string, systolic: number, diastolic: number) {
-    // We gebruiken nu de unieke EHR ID die u eerder kreeg
-    const { error } = await supabase
-        .from('vitals_read_store')
-        .insert([
-            {
-                ehr_id: ehr_id,
-                data_type: 'blood_pressure',
-                recorded_at: new Date().toISOString(),
-                systolic: systolic,
-                diastolic: diastolic,
-            },
-        ]);
-
-    if (error) {
-        // Dit vangt fouten in de Supabase API op (bijv. verkeerde key of onjuiste ehr_id-format)
-        console.error("❌ FOUT bij opslaan in Query Store:", error.message);
-        return false;
-    }
-    return true;
-}
-
-
-async function runProjectionTest() {
-  // CRUCIAAL: Dit moet de ID zijn die u kreeg in de succesvolle 'hello-world' test
-  const TEST_EHR_ID = '9edb2719-268c-429f-a5bb-62608af565f1'; 
+// --- LOGICA AANGEPAST AAN JOUW BESTAANDE TABEL ---
+async function projectVitals() {
+  // 1. We gebruiken de EHR_ID van 'patient.jansen' die je net gaf
+  const targetEhrId = "9edb2719-268c-429f-a5bb-62608af565f1"; 
   
-  // Controleer of de variabelen nu wel geladen zijn
-  if (!supabaseUrl) {
-      console.error("\n❌ FOUT: Supabase URL is nog steeds niet geladen. Controleer of '.env.local' in de root staat en of de pnpm command correct wordt uitgevoerd.");
-      return;
-  }
-  
-  console.log(`\nStart Query Store Validatie voor EHR ID: ${TEST_EHR_ID}`);
-  console.log("1. Schrijf test-data (125/78) direct naar Supabase (Query Store)...");
-  
-  // Dit simuleert de ACTIE van de Projection Service
-  const success = await saveVitalsProjection(TEST_EHR_ID, 125, 78);
+  // 2. Simuleer een nieuwe meting (iets anders dan wat er al in staat)
+  const simulatedMeasurement = {
+    systolic: 128,  // Een variatie op de 125 die je al had
+    diastolic: 80,
+    recorded_at: new Date().toISOString()
+  };
 
-  if (success) {
-    console.log(`\n✅ Projectie Compleet: Bloeddruk 125/78 is nu snel leesbaar in Supabase.`);
-    console.log("---------------------------------------------------");
-    console.log("De CQRS Backbone is geactiveerd. Controleer uw Supabase Dashboard!");
-    console.log("---------------------------------------------------");
+  console.log(`🔄 Projecteren naar 'vitals_read_store' voor EHR: ${targetEhrId}...`);
+
+  // 3. Insert in de bestaande tabel 'vitals_read_store'
+  const { data, error } = await supabase
+    .from('vitals_read_store') // <--- JOUW BESTAANDE TABEL
+    .insert([
+      {
+        ehr_id: targetEhrId,       // De koppeling naar de patiënt
+        data_type: 'blood_pressure',
+        systolic: simulatedMeasurement.systolic,
+        diastolic: simulatedMeasurement.diastolic,
+        recorded_at: simulatedMeasurement.recorded_at,
+      },
+    ])
+    .select();
+
+  if (error) {
+    console.error("❌ Fout bij opslaan:", error.message);
   } else {
-    // Deze foutmelding komt alleen als de Supabase API fout geeft (foute key, RLS-fout)
-    console.log("⚠️ Kan niet schrijven. Controleer Supabase API/RLS instellingen.");
+    console.log("✅ Succes! Data toegevoegd aan 'vitals_read_store':", data);
   }
 }
 
-runProjectionTest(); // Voer de test uit
+projectVitals();

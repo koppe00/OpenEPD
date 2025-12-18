@@ -1,30 +1,26 @@
-
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
-const { withSentryConfig } = require('@sentry/nextjs')
-const { withSupabase } = require('@supabase/nextjs')
-// ... rest van je config
-
-module.exports = withSupabase(withSentryConfig(nextConfig))
-// apps/patient-portal/next.config.js
+/* eslint-disable @typescript-eslint/no-require-imports */
 const path = require('path');
 const fs = require('fs');
 const dotenv = require('dotenv');
 
-// Pad naar de root .env.local vanuit de patient-portal directory
-// Huidige map: apps/patient-portal -> ../.. gaat naar de root
-const ENV_PATH = path.join(process.cwd(), '../../.env.local');
+// Functie om .env uit de root te laden
+function loadRootEnv() {
+  const rootEnvPath = path.join(__dirname, '../../.env');
+  
+  if (fs.existsSync(rootEnvPath)) {
+    const envConfig = dotenv.parse(fs.readFileSync(rootEnvPath));
+    for (const k in envConfig) {
+      process.env[k] = envConfig[k];
+    }
+  }
+}
 
-// Lees en parse het .env.local bestand handmatig
-const envFile = fs.readFileSync(ENV_PATH, 'utf-8');
-const parsedEnv = dotenv.parse(envFile);
+loadRootEnv();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // Exposeer de environment variabelen naar de Next.js procesomgeving
-    env: parsedEnv,
-
-    // Dit zorgt ervoor dat de Next.js app de root node_modules kan bereiken
-    transpilePackages: ['@supabase/supabase-js'],
+  reactStrictMode: true,
+  transpilePackages: ['@supabase/supabase-js'], 
 };
 
 module.exports = nextConfig;
