@@ -1,0 +1,27 @@
+// .devcontainer/devcontainer.json
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:latest",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20.18.0",
+      "pnpmVersion": "9"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+
+  "forwardPorts": [3000, 8080, 5432],
+
+  "postCreateCommand": "npm install -g pnpm turbo"
+}

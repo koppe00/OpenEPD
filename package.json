@@ -1,0 +1,35 @@
+{
+  "name": "open-epd-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "start-ehr": "docker-compose -f infrastructure/ehrbase/docker-compose.yml up -d",
+    "projection:test": "ts-node -r dotenv/config packages/projection-service/project-vitals.ts",
+    "agent:triage": "ts-node -r dotenv/config packages/agent-services/triage-agent.ts",
+    "dev:provider": "pnpm dev --filter provider-dashboard",
+    "dev:patient": "pnpm dev --filter patient-portal"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "turbo": "latest",
+    "tailwindcss": "3.4.4",
+    "postcss": "8.4.31",
+    "autoprefixer": "10.4.19"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.2",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.18.0"
+  }
+}

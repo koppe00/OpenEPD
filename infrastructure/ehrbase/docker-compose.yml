@@ -1,0 +1,42 @@
+version: "3.8"
+services:
+  ehrdb:
+    image: postgres:15 
+    environment:
+      POSTGRES_PASSWORD: ehrbase
+      POSTGRES_USER: ehrbase
+      POSTGRES_DB: ehrbase
+      POSTGRES_HOST_AUTH_METHOD: trust 
+      # --- DEFINITIEVE FIX: Locales forceren ---
+      LANG: en_US.utf8
+      LC_COLLATE: en_US.utf8
+      # ----------------------------------------
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ehrbase"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ehrbase:
+    image: ehrbase/ehrbase:next
+    environment:
+      DB_URL: jdbc:postgresql://ehrdb:5432/ehrbase
+      DB_USER: ehrbase
+      DB_PASSWORD: ehrbase
+      DB_USER_ADMIN: ehrbase
+      DB_PASSWORD_ADMIN: ehrbase
+      SERVER_NODENAME: local.ehrbase.org
+      SECURITY_AUTH_USER: admin
+      SECURITY_AUTH_PASSWORD: password
+      SECURITY_AUTH_ADMIN_USER: admin
+      SECURITY_AUTH_ADMIN_PASSWORD: password
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "*"
+    ports:
+      - "8080:8080"
+    depends_on:
+      ehrdb:
+        condition: service_healthy
