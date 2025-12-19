@@ -60,3 +60,40 @@ Patient Portal: Een laagdrempelige, persoonlijke interface voor de patiënt.
 CQRS Implementatie: Succesvolle scheiding tussen data-verwerking (Projection Service) en data-consumptie (Read Models).
 
 Tech Stack: Stabiele monorepo setup met Turborepo, Next.js 16 (App Router), Tailwind CSS en Supabase.
+
+🚀 Mijlpaal: he Agentic & Sovereign Data Loop
+In deze fase hebben we de kernbelofte van OpenEPD bewezen: Medische intelligentie gecombineerd met data-soevereiniteit.
+
+🧠 The Brain (Agentic Layer)
+Wanneer een zorgverlener data invoert in het provider-dashboard, wordt deze niet passief opgeslagen.
+
+Bestand: apps/provider-dashboard/app/page.tsx
+
+Werking: Een AI-agent onderschept de invoer en genereert direct een agent_note.
+
+Resultaat: De arts krijgt direct klinische context (bijv. waarschuwingen bij hypertensie) in plaats van alleen ruwe cijfers.
+
+🔒 The Storage Bridge (Data Sovereignty)
+OpenEPD gebruikt de cloud slechts als transitstation. De patiënt is de uiteindelijke eigenaar van de data.
+
+Bestand: packages/vault-sync-service.ts
+
+Werking: Een gesimuleerde Local Gateway monitort de cloud op nieuwe records met de status sync_pending.
+
+Proces:
+
+Data landt in de cloud (sync_pending).
+
+De Vault Service "eist de data op", simuleert lokale encryptie en verplaatst de status naar local_vault_only.
+
+De database wordt bijgewerkt met een uniek local_vault_id, wat bewijst dat de data nu in de persoonlijke kluis van de patiënt staat.
+
+🛠 Hoe de demo te draaien
+Start de frontend: pnpm dev
+
+Start de Vault Sync Service in een aparte terminal:
+
+Bash
+
+npx tsx ./packages/vault-sync-service.ts
+Voer een meting in op localhost:3000 en kijk hoe de status real-time verspringt van "Syncing" naar "Stored in Local Vault".
