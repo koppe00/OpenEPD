@@ -1,290 +1,318 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Activity, Clock, User, Plus, X, Save, BrainCircuit, AlertCircle } from 'lucide-react';
+import { PatientProfile } from '../types';
+import { WorkflowMode, WORKFLOW_THEMES } from '@openepd/clinical-core';
 
-// Nu bestaat dit bestand wel:
-import { createClinicalAnalysisPrompt, AI_CONFIG } from '../config/prompts';
+// Hooks
+import { useDashboardLayout } from '../hooks/useDashboardLayout';
+import { useClinicalData } from '../hooks/useClinicalData';
 
-interface VitalSign {
-  id: number;
-  ehr_id: string;
-  data_type: string;
-  systolic: number;
-  diastolic: number;
-  recorded_at: string;
-  agent_note?: string;
-  storage_status?: string;
-}
+// Components
+import { UniversalZibWidget } from '../components/dashboard/UniversalZibWidget';
+import { WorkflowNavigator } from '../components/dashboard/navigation/WorkflowNavigator';
+import { PatientIdentityCard } from '../components/dashboard/clinical/PatientIdentityCard';
+import { MeasurementModal } from '../components/dashboard/MeasurementModal';
+import { ZibDetailPanel } from '../components/dashboard/ZibDetailPanel';
 
-export default function Dashboard() {
-  const [vitals, setVitals] = useState<VitalSign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+// Modules
+import { MedicationModule } from '../components/dashboard/modules/medication/MedicationModule';
+import { OrderEntryModule } from '../components/dashboard/modules/orders/OrderEntryModule';
+import { PlanningModule } from '../components/dashboard/modules/planning/PlanningModule';
+import { ImagingModule } from '../components/dashboard/modules/imaging/ImagingModule';
+
+import { Plus, Search, ChevronRight, LayoutTemplate, Settings } from 'lucide-react';
+
+type ModuleType = 'dossier' | 'medicatie' | 'orders' | 'imaging' | 'planning';
+
+// FIX: Maak een gecombineerd type zodat 'admin' toegestaan is
+type ExtendedWorkflowMode = WorkflowMode | 'admin';
+
+export default function ProviderDashboard() {
+  // --- STATE ---
+  // FIX: Gebruik het nieuwe type in useState
+  const [workflowMode, setWorkflowMode] = useState<ExtendedWorkflowMode>('spreekuur');
   
-  const [newSystolic, setNewSystolic] = useState('');
-  const [newDiastolic, setNewDiastolic] = useState('');
+  const [activeModule, setActiveModule] = useState<ModuleType>('dossier');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [selectedPatient, setSelectedPatient] = useState<PatientProfile | null>(null);
+  const [patients, setPatients] = useState<PatientProfile[]>([]);
+  
+  // Modals & Panels
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [detailZibId, setDetailZibId] = useState<string | null>(null);
 
-  // 1. Initialiseer Supabase
+  // --- SUPABASE & DATA FETCHING ---
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  // 2. EFFECT HOOK (Alles-in-één om linter errors te voorkomen)
   useEffect(() => {
-    // We definiëren de functie BINNEN de effect
-    const loadData = async () => {
-        const { data, error } = await supabase
-            .from('vitals_read_store')
-            .select('*')
-            .eq('ehr_id', '9edb2719-268c-429f-a5bb-62608af565f1')
-            .order('recorded_at', { ascending: false });
-
-        if (!error) setVitals(data as VitalSign[] || []);
-        setLoading(false);
-    };
-
-    // Direct uitvoeren bij start
-    loadData();
-
-    // Abonneren op updates (zodat de lijst ververst na een insert)
-    const channel = supabase
-      .channel('vitals-realtime')
-      .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'vitals_read_store',
-          filter: 'ehr_id=eq.9edb2719-268c-429f-a5bb-62608af565f1' 
-      }, () => {
-          // Bij elke verandering in de DB, laden we opnieuw
-          loadData();
-      })
-      .subscribe();
-
-    return () => { 
-        supabase.removeChannel(channel); 
-    };
-  }, [supabase]); // Geen complexe dependencies meer!
-
-  // 3. ACTIE: Nieuwe meting
-  const handleAddMeasurement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const sys = parseInt(newSystolic);
-    const dia = parseInt(newDiastolic);
-    let aiNote = "Meting handmatig opgeslagen.";
-
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    
-    if (apiKey) {
-        try {
-            const promptText = createClinicalAnalysisPrompt(sys, dia);
-
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${AI_CONFIG.model}:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: promptText }] }],
-                        generationConfig: {
-                            temperature: AI_CONFIG.temperature,
-                            maxOutputTokens: AI_CONFIG.maxOutputTokens
-                        }
-                    })
-                }
-            );
-
-            if (response.status === 429) {
-                console.warn("AI Rate Limit exceeded");
-                aiNote = "AI systeem overbelast (429). Meting is wel opgeslagen.";
-            } else {
-                const data = await response.json();
-                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) aiNote = text;
-            }
-        } catch (err) {
-            console.error("AI Network Error:", err);
-            aiNote = "Meting opgeslagen (AI offline).";
+    const fetchPatients = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) return;
+        
+        const { data: rels } = await supabase
+            .from('care_relationships')
+            .select('profiles:profiles!care_relationships_patient_user_id_fkey (*)')
+            .eq('caregiver_user_id', user.id);
+            
+        if(rels) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const profileList = rels.map((r: any) => r.profiles) as PatientProfile[];
+            setPatients(profileList);
         }
-    }
+    };
+    fetchPatients();
+  }, [supabase]);
 
-    // Insert in Supabase (dit triggert automatisch de useEffect hierboven!)
-    const { error } = await supabase
-      .from('vitals_read_store')
-      .insert([{
-          ehr_id: '9edb2719-268c-429f-a5bb-62608af565f1',
-          data_type: 'blood_pressure',
-          systolic: sys,
-          diastolic: dia,
-          recorded_at: new Date().toISOString(),
-          agent_note: aiNote,
-          storage_status: 'sync_pending'
-      }]);
+  const { observations, refetch: reloadObs } = useClinicalData(selectedPatient?.id);
 
-    if (!error) {
-      setNewSystolic('');
-      setNewDiastolic('');
-      setIsModalOpen(false);
-    }
-    setIsSubmitting(false);
+  const { 
+    leftWidgets, 
+    mainWidgets, 
+    rightWidgets, 
+    loading: layoutLoading,
+    availableTemplates,  
+    activeTemplateId,    
+    switchTemplate       
+  } = useDashboardLayout({
+    // FIX: Types kloppen nu omdat de hook 'admin' accepteert
+    careSetting: workflowMode === 'admin' ? 'admin' : (workflowMode === 'kliniek' ? 'clinical' : 'polyclinic'),
+    specialtyCode: workflowMode === 'admin' ? 'ALG' : 'INT'
+  });
+
+  const selectedZibHistory = useMemo(() => {
+    if (!detailZibId || !observations) return [];
+    return observations.filter(obs => obs.zib_id === detailZibId);
+  }, [detailZibId, observations]);
+
+  // FIX: Fallback voor als workflowMode 'admin' is, want die zit niet in WORKFLOW_THEMES
+  const currentTheme = workflowMode === 'admin' 
+    ? { primary: 'bg-purple-600', secondary: 'bg-purple-100', accent: 'text-purple-600' }
+    : WORKFLOW_THEMES[workflowMode as WorkflowMode];
+
+  const handleAddMeasurement = (zibId: string) => {
+    console.log("Quick add requested for:", zibId);
+    setIsModalOpen(true);
+  };
+
+  const handleViewDetail = (zibId: string) => {
+    setDetailZibId(zibId);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg font-bold tracking-tighter text-lg">OpenEPD</div>
-            <div className="h-4 w-px bg-gray-200" />
-            <h1 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Provider Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-3">
-             <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold leading-none">Dr. Vries</p>
-                <p className="text-[10px] text-gray-400 uppercase font-bold mt-1">Cardiologie</p>
-             </div>
-             <div className="h-10 w-10 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center text-blue-600 shadow-sm">
-                <User size={20} />
-             </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Patiënt Info Card */}
-        <div className="bg-white border border-gray-200 rounded-[2rem] p-8 mb-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-                <div className="h-20 w-20 bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl flex items-center justify-center text-white font-black text-3xl shadow-lg shadow-blue-100">JJ</div>
-                <div>
-                    <h2 className="text-2xl font-black text-gray-900">Jansen, J. (Jan)</h2>
-                    <p className="text-sm text-gray-500 font-medium flex items-center gap-2 mt-1">
-                        <Clock size={16} className="text-blue-500" /> BSN: 123 456 789 • 12 mei 1965 (59j)
-                    </p>
-                </div>
+    <div className="flex h-screen bg-[#F8FAFC] text-slate-900 overflow-hidden">
+      
+      {/* SIDEBAR */}
+      <aside className="w-85 bg-white border-r border-slate-200 flex flex-col shadow-2xl z-30 relative">
+        <div className="p-8 border-b space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`${currentTheme.primary} p-2 rounded-xl text-white shadow-lg`}>
+                <span className="font-black text-xs">EPD</span>
+              </div>
+              <h1 className="font-black text-xl tracking-tighter uppercase italic leading-none">OpenEPD</h1>
             </div>
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="w-full md:w-auto bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl"
-            >
-                <Plus size={20} /> Nieuwe Meting
-            </button>
-        </div>
-
-        <div className="flex items-center gap-3 mb-8">
-            <Activity className="text-blue-600" size={24} />
-            <h3 className="text-xl font-black tracking-tight text-gray-800">Vitale Functies</h3>
-        </div>
-
-        {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[1,2,3].map(i => <div key={i} className="h-48 bg-white rounded-[2rem] animate-pulse border border-gray-100" />)}
           </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {vitals.map((v) => (
-              <div key={v.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all p-8 relative group overflow-hidden">
-                <div className="absolute top-0 right-0 p-4">
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
-                        v.storage_status === 'sync_pending' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                    }`}>
-                        {v.storage_status === 'sync_pending' ? '☁️ Syncing' : '🏠 Sovereign'}
-                    </span>
-                </div>
+          <nav className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50">
+            <button onClick={() => setWorkflowMode('spreekuur')} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${workflowMode === 'spreekuur' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>Poli</button>
+            <button onClick={() => setWorkflowMode('kliniek')} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${workflowMode === 'kliniek' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>Kliniek</button>
+            <button onClick={() => setWorkflowMode('admin')} className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${workflowMode === 'admin' ? 'bg-white shadow-sm text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}>Admin & Logistiek</button>
+          </nav>
+        </div>
+        
+        {/* FIX: Alleen WorkflowNavigator tonen als we NIET in admin mode zijn, of aangepaste navigator */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {workflowMode === 'admin' ? (
+              <div className="p-6 text-center text-slate-400 text-xs italic">
+                  Selecteer een module in het dashboard
+              </div>
+          ) : (
+              <WorkflowNavigator 
+                patients={patients} 
+                viewMode={workflowMode as WorkflowMode} 
+                selectedId={selectedPatient?.id} 
+                onSelect={setSelectedPatient} 
+                searchTerm={searchTerm} 
+                onSearchChange={setSearchTerm} 
+              />
+          )}
+        </div>
 
-                <div className="text-xs text-gray-400 mb-4 font-bold flex items-center gap-1">
-                    <Clock size={12} />
-                    {new Date(v.recorded_at).toLocaleDateString('nl-NL')} • {new Date(v.recorded_at).toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'})}
-                </div>
+        <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-1.5">
+           <ModuleButton active={activeModule === 'dossier'} onClick={() => setActiveModule('dossier')} label="Kern Dossier" />
+           <ModuleButton active={activeModule === 'medicatie'} onClick={() => setActiveModule('medicatie')} label="Medicatie" />
+           <ModuleButton active={activeModule === 'orders'} onClick={() => setActiveModule('orders')} label="Orders" />
+        </div>
+      </aside>
 
-                <div className="flex items-baseline gap-2 mb-6">
-                    <span className="text-5xl font-black text-gray-900 tracking-tighter">{v.systolic}</span>
-                    <span className="text-2xl font-bold text-gray-300">/</span>
-                    <span className="text-5xl font-black text-gray-900 tracking-tighter">{v.diastolic}</span>
-                    <span className="text-xs font-black text-gray-400 ml-1">mmHg</span>
-                </div>
-
-                {/* AI Note Display */}
-                {v.agent_note && (
-                  <div className="mt-4 p-5 bg-blue-50/50 rounded-2xl border-l-4 border-blue-500">
-                    <div className="flex items-center gap-2 mb-2">
-                        {v.agent_note.includes('429') ? (
-                           <AlertCircle size={14} className="text-orange-500" />
-                        ) : (
-                           <BrainCircuit size={14} className="text-blue-600" />
-                        )}
-                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                            {v.agent_note.includes('429') ? 'System Alert' : 'Gemini Analysis'}
-                        </span>
-                    </div>
-                    <p className="text-sm text-blue-900 leading-relaxed font-medium italic">
-                      &quot;{v.agent_note}&quot;
-                    </p>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Voor admin mode hoeven we niet per se een patient geselecteerd te hebben */}
+        {selectedPatient || workflowMode === 'admin' ? (
+          <>
+            <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 p-6 flex justify-between items-center sticky top-0 z-20">
+              {workflowMode === 'admin' ? (
+                  <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-100 rounded-lg text-purple-600 font-bold text-xs uppercase">Centrale Balie</div>
+                      <span className="text-sm font-bold text-slate-700">Overzicht</span>
                   </div>
+              ) : (
+                  <PatientIdentityCard patient={selectedPatient!} />
+              )}
+              
+              <div className="flex items-center gap-4">
+                 <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
+                    <LayoutTemplate size={14} className="text-slate-400" />
+                    {layoutLoading ? (
+                        <span className="text-[10px] text-slate-400 font-mono animate-pulse">Layout laden...</span>
+                    ) : (
+                        <select 
+                            value={activeTemplateId || ''} 
+                            onChange={(e) => switchTemplate(e.target.value)}
+                            className="bg-transparent text-[10px] font-bold uppercase text-slate-700 outline-none cursor-pointer min-w-[160px]"
+                            disabled={availableTemplates.length === 0}
+                        >
+                            {availableTemplates.length > 0 ? (
+                                availableTemplates.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))
+                            ) : (
+                                <option>Geen layouts beschikbaar</option>
+                            )}
+                        </select>
+                    )}
+                 </div>
+
+                 <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-900/10">
+                  <Plus size={16} /> Actie
+                 </button>
+              </div>
+            </header>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC] custom-scrollbar">
+              <div className="max-w-[1920px] mx-auto h-full">
+                
+                {activeModule === 'dossier' && (
+                  layoutLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                        <div className="text-center py-20 text-slate-400 animate-pulse text-xs uppercase tracking-widest flex flex-col items-center gap-4">
+                            <LayoutTemplate size={48} className="opacity-20" />
+                            Dashboard context opbouwen...
+                        </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-12 gap-6 h-full min-h-0">
+                      
+                      {/* LINKER KOLOM */}
+                      <div className="col-span-12 lg:col-span-3 flex flex-col gap-6 overflow-y-auto pb-10 custom-scrollbar pr-2">
+                         {leftWidgets.map(widget => (
+                           <div key={widget.instance_id} className="min-h-[200px] animate-in slide-in-from-left-4 duration-500 fade-in">
+                             <UniversalZibWidget 
+                               widget={widget} 
+                               observations={observations || []}
+                               patientId={selectedPatient?.id || 'admin'} // Fallback voor admin
+                               onAddMeasurement={handleAddMeasurement}
+                               onViewDetail={handleViewDetail}
+                               onDataChange={reloadObs}
+                             />
+                           </div>
+                         ))}
+                      </div>
+
+                      {/* MIDDEN KOLOM */}
+                      <div className="col-span-12 lg:col-span-6 flex flex-col gap-6 overflow-y-auto pb-10 custom-scrollbar px-2">
+                         {mainWidgets.map(widget => (
+                           <div key={widget.instance_id} className="flex-1 min-h-[400px] animate-in zoom-in-95 duration-500 fade-in">
+                              <UniversalZibWidget 
+                                widget={widget} 
+                                observations={observations || []}
+                                patientId={selectedPatient?.id || 'admin'}
+                                onAddMeasurement={handleAddMeasurement}
+                                onViewDetail={handleViewDetail}
+                                onDataChange={reloadObs}
+                              />
+                           </div>
+                         ))}
+                         {mainWidgets.length === 0 && (
+                           <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-400 text-xs uppercase tracking-widest gap-4">
+                             <Settings size={32} className="opacity-20" />
+                             Sleep widgets naar &apos;Main Content&apos; in Admin
+                           </div>
+                         )}
+                      </div>
+
+                      {/* RECHTER KOLOM */}
+                      <div className="col-span-12 lg:col-span-3 flex flex-col gap-6 overflow-y-auto pb-10 custom-scrollbar pl-2">
+                         {rightWidgets.map(widget => (
+                           <div key={widget.instance_id} className="min-h-[200px] animate-in slide-in-from-right-4 duration-500 fade-in">
+                              <UniversalZibWidget 
+                                widget={widget} 
+                                observations={observations || []}
+                                patientId={selectedPatient?.id || 'admin'}
+                                onAddMeasurement={handleAddMeasurement}
+                                onViewDetail={handleViewDetail}
+                                onDataChange={reloadObs}
+                              />
+                           </div>
+                         ))}
+                      </div>
+                    </div>
+                  )
+                )}
+                
+                {/* ANDERE MODULES - Alleen tonen als NIET in admin mode, of specifiek maken */}
+                {workflowMode !== 'admin' && (
+                    <>
+                        {activeModule === 'medicatie' && <MedicationModule />}
+                        {activeModule === 'orders' && <OrderEntryModule />}
+                        {activeModule === 'planning' && <PlanningModule />}
+                        {activeModule === 'imaging' && <ImagingModule />}
+                    </>
                 )}
               </div>
-            ))}
+            </div>
+          </>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-slate-200 italic bg-slate-50/30">
+            <Search size={100} strokeWidth={0.5} className="opacity-20 mb-6" />
+            <p className="font-black uppercase tracking-[0.5em] text-sm text-slate-300">Selecteer een patiënt</p>
           </div>
         )}
       </main>
 
-      {/* --- MODAL --- */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden border border-white">
-                <div className="px-8 py-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                    <div>
-                        <h3 className="font-black text-2xl text-gray-900">Nieuwe Meting</h3>
-                        <p className="text-sm text-gray-500 font-medium">Bloeddruk invoeren voor dossier</p>
-                    </div>
-                    <button onClick={() => setIsModalOpen(false)} className="bg-white p-2 rounded-full shadow-sm hover:bg-gray-100 transition-colors border border-gray-100">
-                        <X size={24} />
-                    </button>
-                </div>
-                
-                <form onSubmit={handleAddMeasurement} className="p-10 space-y-8">
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Bovendruk</label>
-                            <input 
-                                type="number" required value={newSystolic}
-                                onChange={(e) => setNewSystolic(e.target.value)}
-                                className="w-full bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-500 focus:bg-white px-6 py-6 text-4xl font-black outline-none transition-all shadow-inner" 
-                                placeholder="120"
-                            />
-                        </div>
-                        <div className="space-y-3">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Onderdruk</label>
-                            <input 
-                                type="number" required value={newDiastolic}
-                                onChange={(e) => setNewDiastolic(e.target.value)}
-                                className="w-full bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-500 focus:bg-white px-6 py-6 text-4xl font-black outline-none transition-all shadow-inner" 
-                                placeholder="80"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-4">
-                        <button 
-                            type="submit" disabled={isSubmitting}
-                            className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-lg hover:bg-blue-700 flex justify-center items-center gap-3 shadow-xl shadow-blue-200 transition-all active:scale-95"
-                        >
-                            {isSubmitting ? (
-                                <>Analyseren & Opslaan...</>
-                            ) : (
-                                <><Save size={24} /> Meting Opslaan</>
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+      {/* MODALS & PANELS */}
+      {selectedPatient && (
+        <>
+          <MeasurementModal 
+            isOpen={isModalOpen} 
+            onClose={() => setIsModalOpen(false)} 
+            patientId={selectedPatient.id} 
+            onSaveSuccess={reloadObs} 
+          />
+          <ZibDetailPanel 
+            isOpen={!!detailZibId} 
+            onClose={() => setDetailZibId(null)} 
+            zibId={detailZibId} 
+            history={selectedZibHistory} 
+            onAddEntry={() => { setDetailZibId(null); setIsModalOpen(true); }} 
+          />
+        </>
       )}
     </div>
   );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ModuleButton({ active, onClick, label }: any) {
+    return (
+      <button onClick={onClick} className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-[10px] font-black uppercase transition-all ${active ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
+        <div className="flex items-center gap-3">{label}</div>
+        <ChevronRight size={14} className={`transition-transform ${active ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`} />
+      </button>
+    );
 }

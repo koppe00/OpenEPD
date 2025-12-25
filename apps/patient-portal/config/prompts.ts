@@ -1,28 +1,24 @@
 export const AI_CONFIG = {
-  model: "gemini-2.5-flash-lite",
-  temperature: 0.7,
-  maxOutputTokens: 1000, // <--- HIER staat nu de fix (was 100)
+  model: "gemini-2.5-flash-lite", // Dit model staat in je lijst!
+  temperature: 0.2,
+  maxOutputTokens: 500, 
 };
 
+// Voor de PATIËNT (Portaal)
 export const createPatientAdvicePrompt = (
   systolic: number,
   diastolic: number,
-  doctorNote: string = 'Geen specifieke opmerking'
+  note: string
 ): string => {
   return `
-    Je bent een zorgzame, persoonlijke medische coach in een PGO app.
+    Rol: Vriendelijke medische assistent.
+    Taak: Leg de meting ${systolic}/${diastolic} mmHg uit aan de patiënt.
+    Context arts: ${note || 'Geen'}.
     
-    CONTEXT DATA:
-    - Patiënt Bloeddruk: ${systolic}/${diastolic} mmHg
-    - Notitie van arts: "${doctorNote}"
-    
-    JOUW OPDRACHT:
-    Schrijf een kort, advies voor de patiënt.
-    
-    RICHTLIJNEN:
-    1. Toon & Stijl: Baseer je op de arts-notitie. Is die ernstig? Wees dan direct en serieus. Is die goed? Wees dan complimenteus.
-    2. Taal: B1-niveau (begrijpelijk Nederlands).
-    3. Lengte: Maximaal 3 zinnen.
-    4. BELANGRIJK: Maak je zinnen altijd volledig af. Stop nooit halverwege een zin.
+    Output vereisten:
+    1. Begrijpelijke taal voor de patiënt.
+    2. 1-2 simpele tips, geruststellende toon.
+    3. Maximaal 3 korte zinnen.
+    4. Geen medisch jargon, taal: Nederlands.
   `;
 };

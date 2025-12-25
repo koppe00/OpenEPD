@@ -1,0 +1,272 @@
+'use client';
+
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+import { User, Plus, Search, ChevronRight, Activity, X, Sparkles, ShieldCheck, Cloud } from 'lucide-react';
+import { createClinicalAnalysisPrompt, AI_CONFIG } from '../config/prompts';
+
+interface PatientProfile {
+  id: string;
+  full_name: string;
+  bsn_number: string;
+  date_of_birth: string;
+}
+
+interface VitalSign {
+  id: string;
+  systolic: number;
+  diastolic: number;
+  recorded_at: string;
+  agent_note: string;
+  storage_status: string; // Toegevoegd voor de Sync Status
+}
+
+interface CareRelationshipResponse {
+  patient_user_id: string;
+  profiles: PatientProfile | null;
+}
+
+export default function ProviderDashboard() {
+  const [patients, setPatients] = useState<PatientProfile[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientProfile | null>(null);
+  const [vitals, setVitals] = useState<VitalSign[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newSystolic, setNewSystolic] = useState('');
+  const [newDiastolic, setNewDiastolic] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const supabase = useMemo(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+
+  const loadVitals = useCallback(async (patientId: string) => {
+    // Haal ook storage_status op uit de database
+    const { data, error } = await supabase
+      .from('vitals_read_store')
+      .select('id, systolic, diastolic, recorded_at, agent_note, storage_status')
+      .eq('ehr_id', patientId)
+      .order('recorded_at', { ascending: false });
+    
+    if (!error && data) {
+      setVitals(data as VitalSign[]);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const { data: relationships, error } = await supabase
+        .from('care_relationships')
+        .select(`
+          patient_user_id,
+          profiles:profiles!care_relationships_patient_user_id_fkey (id, full_name, bsn_number, date_of_birth)
+        `);
+
+      if (!error && relationships) {
+        const typedRelationships = relationships as unknown as CareRelationshipResponse[];
+        const mapped = typedRelationships
+          .map((r) => r.profiles)
+          .filter((p): p is PatientProfile => p !== null);
+        setPatients(mapped);
+      }
+      setLoading(false);
+    };
+    loadData();
+  }, [supabase]);
+
+  const selectPatient = (patient: PatientProfile) => {
+    setSelectedPatient(patient);
+    loadVitals(patient.id);
+  };
+
+  const handleSaveMeasurement = async () => {
+    if (!selectedPatient || !newSystolic || !newDiastolic) return;
+    setIsSaving(true);
+
+    try {
+      let aiNote = "Klinische analyse volgt...";
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
+      if (apiKey) {
+        try {
+          const prompt = createClinicalAnalysisPrompt(
+            Number(newSystolic), 
+            Number(newDiastolic), 
+            "Handmatige invoer arts"
+          );
+          
+          const aiResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${AI_CONFIG.model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: AI_CONFIG.temperature,
+                  maxOutputTokens: AI_CONFIG.maxOutputTokens
+                }
+              })
+            }
+          );
+
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            aiNote = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || aiNote;
+          }
+        } catch (e) {
+          console.error("AI Error:", e);
+          aiNote = "AI limiet bereikt. Meting opgeslagen.";
+        }
+      }
+
+      const { error } = await supabase
+        .from('vitals_read_store')
+        .insert([
+          {
+            ehr_id: selectedPatient.id,
+            systolic: parseInt(newSystolic, 10),
+            diastolic: parseInt(newDiastolic, 10),
+            data_type: 'blood_pressure',
+            agent_note: aiNote,
+            storage_status: 'synced', // We zetten hem op synced voor de demo
+            recorded_at: new Date().toISOString()
+          }
+        ]);
+
+      if (!error) {
+        await loadVitals(selectedPatient.id);
+        setIsModalOpen(false);
+        setNewSystolic('');
+        setNewDiastolic('');
+      }
+    } catch (err) {
+      console.error("Systeemfout:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Activity className="animate-spin text-blue-600" /></div>;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex text-slate-900 relative">
+      {/* Sidebar */}
+      <aside className="w-85 bg-white border-r border-gray-200 flex flex-col shadow-xl">
+        <div className="p-8 border-b border-gray-100">
+          <div className="flex items-center gap-3 mb-6">
+             <div className="bg-blue-600 p-2 rounded-lg text-white shadow-lg shadow-blue-100"><Activity size={20} /></div>
+             <h2 className="font-black text-xl tracking-tighter uppercase">OpenEPD</h2>
+          </div>
+          <div className="relative text-slate-400">
+            <Search className="absolute left-3 top-3.5" size={16} />
+            <input className="w-full bg-gray-50 rounded-xl py-3 pl-10 pr-4 text-sm outline-none border border-transparent focus:border-blue-100 text-slate-900" placeholder="Zoek patiënt..." />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {patients.map(p => (
+            <button key={p.id} onClick={() => selectPatient(p)} className={`w-full p-6 flex items-center justify-between hover:bg-slate-50 border-b border-gray-50 transition-all ${selectedPatient?.id === p.id ? 'bg-blue-50/50 border-r-4 border-r-blue-600' : ''}`}>
+              <div className="text-left">
+                <p className="font-bold text-sm tracking-tight">{p.full_name}</p>
+                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest mt-1">BSN: {p.bsn_number}</p>
+              </div>
+              <ChevronRight size={16} className={selectedPatient?.id === p.id ? 'text-blue-500' : 'text-gray-200'} />
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-10 overflow-y-auto">
+        {selectedPatient ? (
+          <div className="max-w-4xl mx-auto">
+            {/* Patiënt Header Card */}
+            <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100 mb-10 flex justify-between items-center">
+              <div className="flex items-center gap-8">
+                <div className="h-20 w-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center text-white text-3xl font-black">{selectedPatient.full_name[0]}</div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">{selectedPatient.full_name}</h2>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">BSN: {selectedPatient.bsn_number} • Geboren: {new Date(selectedPatient.date_of_birth).toLocaleDateString('nl-NL')}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(true)} className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-3 hover:scale-105 transition-all shadow-xl">
+                <Plus size={18} /> Nieuwe Meting
+              </button>
+            </div>
+
+            {/* Vitals Grid */}
+            <div className="grid gap-8 md:grid-cols-2">
+              {vitals.map(v => (
+                <div key={v.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-50 shadow-sm flex flex-col">
+                  {/* GECORRIGEERD: Badges binnen de map-loop */}
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                      {new Date(v.recorded_at).toLocaleString('nl-NL')}
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+                      <div className={`h-1.5 w-1.5 rounded-full ${v.storage_status === 'synced' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+                      <span className="text-[9px] font-black uppercase text-gray-500 tracking-tighter">
+                        {v.storage_status === 'synced' ? 'Patient Vault Synced' : 'Cloud Storage'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-baseline gap-2 mb-6">
+                    <span className="text-5xl font-black tracking-tighter text-gray-900">{v.systolic}/{v.diastolic}</span>
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">mmHg</span>
+                  </div>
+
+                  {v.agent_note && (
+                    <div className="mt-auto p-4 bg-blue-50/30 rounded-2xl text-[11px] text-blue-800 font-semibold italic border-l-4 border-blue-500">
+                      &quot;{v.agent_note}&quot;
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center text-gray-300 flex-col gap-6 opacity-30 italic font-black uppercase tracking-[0.4em]">
+            <User size={120} strokeWidth={0.5} />
+            Dossier Selecteren
+          </div>
+        )}
+      </main>
+
+      {/* MODAL blijft ongewijzigd... */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 text-slate-900">
+           <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-black tracking-tighter uppercase">Bloeddruk registreren</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X size={20} /></button>
+            </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block text-slate-400">Systolisch</label>
+                  <input type="number" value={newSystolic} onChange={(e) => setNewSystolic(e.target.value)} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl p-4 text-2xl font-black outline-none" placeholder="120" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Diastolisch</label>
+                  <input type="number" value={newDiastolic} onChange={(e) => setNewDiastolic(e.target.value)} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 rounded-2xl p-4 text-2xl font-black outline-none" placeholder="80" />
+                </div>
+              </div>
+              <button onClick={handleSaveMeasurement} disabled={isSaving || !newSystolic || !newDiastolic} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-blue-700 disabled:opacity-50">
+                {isSaving ? 'AI analyseert & slaat op...' : 'Meting Valideren'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

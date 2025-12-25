@@ -1,16 +1,19 @@
 export const AI_CONFIG = {
-model: "gemini-2.5-flash-lite",
-  temperature: 0.2, // Laag voor zakelijke precisie
+  model: "gemini-2.5-flash-lite", // Dit model staat in je lijst!
+  temperature: 0.2,
   maxOutputTokens: 500, 
 };
 
+// Voor de ARTS (Dashboard)
 export const createClinicalAnalysisPrompt = (
   systolic: number,
-  diastolic: number
+  diastolic: number,
+  note: string
 ): string => {
   return `
     Rol: Medische administratieve assistent.
     Taak: Analyseer de bloeddrukmeting: ${systolic}/${diastolic} mmHg.
+    Extra context van de arts: ${note || 'Geen'}.
     
     Output vereisten:
     1. Geef enkel de medische classificatie (bijv. "Hypertensie graad 1").

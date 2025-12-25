@@ -1,0 +1,1 @@
+export const ConsentStatus = () => <div className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 italic">Toegang Legitiem</div>;
