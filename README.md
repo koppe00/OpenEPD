@@ -41,6 +41,45 @@ Licentie: Dit project is gelicenseerd onder GNU General Public License versie 3 
 meer informatie: Uigebreid conceptueel ontwerp: https://docs.google.com/document/d/15OIgRELi9W2JiKSvtPuIYkrDO_uVW-5yt_5gboskDFY/edit?usp=drivesdk Functionele onderdelen voor een open-source Elektronisch Patiëntendossier (EPD) https://docs.google.com/document/d/1jHxhrscqeIHNaKtjN7-xYYRcE04447KPPdBOw3F999I/edit?usp=drivesdk
 
 --
+Versie 2.3 Release Notes: Van MVP naar Context-Aware EPD:
+
+1. Architectuur & Workflow (Core)
+Dynamic Template Switching: Implementatie van een LayoutTemplate selector in de header. Gebruikers kunnen nu realtime wisselen tussen verschillende dashboard-inrichtingen (bijv. 'Standaard Poli' vs 'Vasculair Risico').
+
+Context-Aware Care Settings: Het systeem herkent nu drie hoofdomgevingen: Poli (Polyclinic), Kliniek (Clinical) en Administratie & Logistiek (Admin).
+
+Real-time Data Sync: Verbeterde onDataChange triggers in alle widgets, waardoor invoer in de 'Smart Editor' direct reflecteert in trendlijsten en de AI-copilot zonder pagina-refresh.
+
+2. Administratie & Logistiek (Nieuwe Module)
+Instroom-beheer: Introductie van de Referral Inbox, een werklijst voor inkomende verwijzingen (simulatie van ZorgDomein/Edifact).
+
+Patiëntregistratie & Inschrijving: Voorbereiding voor de inschrijf-wizard om de 'Front-Office' flow uit het functioneel ontwerp te ondersteunen.
+
+Wachtkamer & Planning: Implementatie van de Appointment Scheduler, inclusief status-tracking van patiënten (Gepland, In Wachtkamer, In Consult).
+
+3. Klinische Deep-Dive (Specialismen)
+Internisten-Layouts: Specifieke SQL-injecties voor de vakgroep Interne Geneeskunde, inclusief layouts voor metabole consulten en klinische visites.
+
+Smart Template Editor v2: Geoptimaliseerde hybride editor die narratieve verslaglegging (Anamnese/Decursus) combineert met gestructureerde ZIB-data velden.
+
+Zib History Table: Verbeterde weergave van historische metingen met dynamische kolom-detectie op basis van ZIB-content.
+
+4. Beheer & Configuratie (Admin Portaal)
+Visual Template Builder: Volledige UI voor het ontwerpen van dashboards.
+
+ZibSorter Component: Nieuwe interactieve component voor beheerders om de volgorde van ZIB-velden binnen een widget te bepalen via 'Up/Down' controls.
+
+Template Management: Functionaliteit toegevoegd voor het bewerken van template-namen, omschrijvingen en specialisme-koppelingen.
+
+5. Code Quality & Bugfixes (Technical Debt)
+Strict Typing: Fixes voor TypeScript errors rondom ExtendedWorkflowMode en UseDashboardLayoutProps.
+
+React Optimization: Oplossen van 'cascading renders' in de useDashboardLayout hook door asynchrone state-updates te groeperen.
+
+Lucide-React Update: Integratie van nieuwe iconen voor betere visuele herkenbaarheid van administratieve vs. klinische widgets.
+
+
+--
 Architectuur versie 2.2 - Inclusief Dutch Connectors & Local Bridge
 Status:
 
@@ -97,3 +136,4 @@ Bash
 
 npx tsx ./packages/vault-sync-service.ts
 Voer een meting in op localhost:3000 en kijk hoe de status real-time verspringt van "Syncing" naar "Stored in Local Vault".
+
