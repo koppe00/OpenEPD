@@ -9,14 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@openepd/clinical-core": "workspace:*",
     "@sentry/nextjs": "^10.32.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.86.2",
+    "clinical-core": "link:../packages/clinical-core",
     "lucide-react": "^0.562.0",
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "@openepd/clinical-core": "workspace:*"
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

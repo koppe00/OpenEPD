@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@clinical-core/*": ["../../packages/clinical-core/src/*"],
+      "@openepd/clinical-core/*": ["../../packages/clinical-core/src/*"]
     }
   },
   "include": [

@@ -1,225 +1,326 @@
+// apps/patient-portal/app/page.tsx
+
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Activity, Shield, HeartPulse, Sparkles, LogOut, Lock } from 'lucide-react';
-import { createPatientAdvicePrompt, AI_CONFIG } from '../config/prompts';
+import {
+  Shield,
+  Activity,
+  LogOut,
+  HeartPulse,
+  ChevronDown,
+  TrendingUp,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { nl } from 'date-fns/locale';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
-interface VitalRecord {
+// Jouw core
+import { ZIB_CONFIG } from '@openepd/clinical-core/constants/zibConfig';
+import { ZibValidationService } from '@openepd/clinical-core/validation/ZibValidationService';
+
+// === Types ===
+interface ZibComposition {
   id: string;
-  systolic: number;
-  diastolic: number;
+  zib_id: string;
+  content: Record<string, unknown>;
   recorded_at: string;
-  agent_note: string;
-  storage_status: string; // Cruciaal voor de Sync Badge
+  storage_status: string;
 }
 
-interface UserProfile {
-  id: string;
-  user_metadata: {
-    full_name?: string;
-  };
+interface BloodPressurePoint {
+  date: string;
+  systolic?: number;
+  diastolic?: number;
 }
 
 export default function PatientPortal() {
-  const [vitals, setVitals] = useState<VitalRecord[]>([]);
-  const [patientAdvice, setPatientAdvice] = useState<string>("Uw soevereine schil analyseert de laatste meting...");
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [zibs, setZibs] = useState<ZibComposition[]>([]);
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['Bloeddruk']));
+  const [patientAdvice, setPatientAdvice] = useState<string>('Uw dossier wordt veilig geladen...');
   const [loading, setLoading] = useState(true);
 
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  const supabase = useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      ),
+    []
+  );
 
-  const generateSovereignAdvice = useCallback(async (vital: VitalRecord) => {
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-      setPatientAdvice("De AI-coach is momenteel in ruststand. Bekijk uw waarden hieronder.");
-      return;
-    }
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(section)) newSet.delete(section);
+      else newSet.add(section);
+      return newSet;
+    });
+  };
 
-    const promptText = createPatientAdvicePrompt(vital.systolic, vital.diastolic, vital.agent_note);
+  // Extract bloeddruk historie met jouw validation service – type-safe
+  const bloodPressureHistory = useMemo<BloodPressurePoint[]>(() => {
+    return zibs
+      .filter((zib) => zib.zib_id.includes('Bloeddruk') || zib.zib_id.includes('BloodPressure'))
+      .map((zib) => {
+        const validationResult = ZibValidationService.validate(zib.zib_id, zib.content);
+        const data = validationResult.success ? validationResult.data : {};
 
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${AI_CONFIG.model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { 
-              temperature: AI_CONFIG.temperature, 
-              maxOutputTokens: AI_CONFIG.maxOutputTokens 
-            }
-          })
-        }
-      );
-      
-      if (response.status === 429) {
-        setPatientAdvice("U heeft vandaag de regie genomen over al uw analyses. De AI rust uit tot morgen.");
-        return;
+        const systolic = 'systolic' in data ? Number(data.systolic) : undefined;
+        const diastolic = 'diastolic' in data ? Number(data.diastolic) : undefined;
+
+        return {
+          date: format(new Date(zib.recorded_at), 'dd MMM yyyy'),
+          systolic: systolic && !isNaN(systolic) ? systolic : undefined,
+          diastolic: diastolic && !isNaN(diastolic) ? diastolic : undefined,
+        };
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [zibs]);
+
+  // Groepeer op basis van ZIB_CONFIG aanwezigheid + fallback
+  const groupedZibs = useMemo<[string, ZibComposition[]][]>(() => {
+    const groups: Record<string, ZibComposition[]> = {};
+
+    zibs.forEach((zib) => {
+      let category = 'Overig';
+
+      if (ZIB_CONFIG[zib.zib_id]) {
+        const shortName = zib.zib_id.split('.').pop() || zib.zib_id;
+        category = shortName.charAt(0).toUpperCase() + shortName.slice(1);
+      } else {
+        const shortName = zib.zib_id.split('.').pop() || zib.zib_id;
+        category = shortName;
       }
 
-      const data = await response.json();
-      setPatientAdvice(data?.candidates?.[0]?.content?.parts?.[0]?.text || "Uw waarden zijn stabiel.");
-    } catch (error) {
-      setPatientAdvice("Uw lokale data is veilig, maar de analyse-laag is offline.");
-    }
-  }, []);
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(zib);
+    });
+
+    const ordered = ['Bloeddruk', 'Beleid', 'LichamelijkOnderzoek', 'Laboratoriumuitslagen', 'Alert', 'Medicatie', 'Overig'];
+
+    const sorted: [string, ZibComposition[]][] = [];
+
+    ordered.forEach((cat) => {
+      if (groups[cat]) {
+        sorted.push([
+          cat,
+          groups[cat].sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()),
+        ]);
+      }
+    });
+
+    Object.keys(groups)
+      .filter((cat) => !ordered.includes(cat))
+      .sort()
+      .forEach((cat) => sorted.push([cat, groups[cat]]));
+
+    return sorted;
+  }, [zibs]);
 
   useEffect(() => {
-    const initPortal = async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData?.user) {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const init = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
         window.location.href = '/login';
         return;
       }
-      
-      setUser(authData.user as unknown as UserProfile);
 
-      const { data, error } = await supabase
-        .from('vitals_read_store')
-        .select('id, systolic, diastolic, recorded_at, agent_note, storage_status')
-        .eq('ehr_id', authData.user.id)
+      const { data: zibData } = await supabase
+        .from('zib_compositions')
+        .select('id, zib_id, content, recorded_at, storage_status')
         .order('recorded_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        const typedData = data as VitalRecord[];
-        setVitals(typedData);
-        generateSovereignAdvice(typedData[0]);
+      if (zibData) {
+        setZibs(zibData as ZibComposition[]);
+        setPatientAdvice('Uw persoonlijke gezondheidsdossier is veilig gesynchroniseerd en klaar voor inzage.');
       }
+
       setLoading(false);
     };
 
-    initPortal();
-  }, [generateSovereignAdvice, supabase]);
+    init();
+
+    channel = supabase.channel('patient-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'zib_compositions' }, init)
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-      <div className="flex flex-col items-center gap-6">
-        <Activity className="text-emerald-500 animate-pulse" size={48} />
-        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 text-center">
-            Dossier beveiligen...<br/>Vault Sync Initializing
-        </p>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="flex flex-col items-center gap-6">
+          <Activity className="text-emerald-500 animate-pulse" size={48} />
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 text-center">
+            Dossier beveiligen...<br />Vault Sync Initializing
+          </p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20 text-slate-900 font-sans">
       <header className="bg-white/80 backdrop-blur-xl border-b p-6 sticky top-0 z-50 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <div className="bg-slate-900 p-2.5 rounded-2xl text-white shadow-lg shadow-slate-200">
+          <div className="bg-slate-900 p-2.5 rounded-2xl text-white shadow-lg">
             <Shield size={20} />
           </div>
           <div>
             <h1 className="font-black text-xl tracking-tighter uppercase leading-none">MyEPD</h1>
-            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">End-to-End Encrypted</span>
+            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+              End-to-End Encrypted • Patiënt in Regie
+            </span>
           </div>
         </div>
-        <button onClick={handleSignOut} className="bg-slate-50 p-3 rounded-2xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100">
+        <button onClick={handleSignOut} className="bg-slate-50 p-3 rounded-2xl hover:bg-rose-50 transition">
           <LogOut size={20} />
         </button>
       </header>
 
-      <main className="max-w-2xl mx-auto p-6 space-y-12 mt-8">
-        {/* Sovereign Intelligence Schil */}
+      <main className="max-w-5xl mx-auto p-6 space-y-12 mt-8">
+        {/* Sovereign Insights */}
         <div className="group relative">
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-blue-500 rounded-[3.5rem] blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-          <div className="relative bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl overflow-hidden">
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-blue-500 rounded-[3.5rem] blur opacity-20 group-hover:opacity-30 transition"></div>
+          <div className="relative bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl">
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-8">
-                <Sparkles size={18} className="text-emerald-400" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400/80">Sovereign Insights</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400/80">
+                  Sovereign Insights
+                </span>
               </div>
               <p className="text-2xl font-medium leading-relaxed tracking-tight italic text-slate-100">
                 &quot;{patientAdvice}&quot;
               </p>
             </div>
-            <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-emerald-500/10 blur-[120px] rounded-full"></div>
           </div>
         </div>
 
-        {/* Vault-Sync-Service Monitor */}
-        <section className="bg-emerald-50/50 border border-emerald-100 rounded-[2.5rem] p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500 h-2 w-2 rounded-full animate-pulse"></div>
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Vault-Sync-Service</h4>
+        {/* Bloeddruk Trend Grafiek */}
+        {bloodPressureHistory.length > 1 && (
+          <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 mb-8">
+              <TrendingUp size={24} className="text-rose-500" />
+              <h3 className="font-black text-2xl tracking-tight">Bloeddruk Trend</h3>
             </div>
-            <span className="text-[9px] font-bold bg-white px-3 py-1 rounded-full border border-emerald-100 text-emerald-600 uppercase tracking-widest">Active</span>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-emerald-100/50 text-center">
-              <p className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Source</p>
-              <p className="text-[10px] font-bold text-slate-700">OpenEPD GP</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-emerald-100/50 text-center">
-              <p className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Node</p>
-              <p className="text-[10px] font-bold text-slate-700 italic">local-vault-01</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-emerald-100/50 text-center">
-              <p className="text-[8px] font-black text-slate-400 uppercase mb-1 tracking-widest">Encryption</p>
-              <p className="text-[10px] font-bold text-emerald-600 tracking-tighter uppercase">AES-256</p>
-            </div>
-          </div>
-        </section>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={bloodPressureHistory} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis domain={[60, 180]} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px' }}
+                  labelStyle={{ color: '#94a3b8' }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="systolic" 
+                  stroke="#ef4444" 
+                  strokeWidth={3} 
+                  dot={{ fill: '#ef4444', r: 6 }}
+                  name="Systolisch"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="diastolic" 
+                  stroke="#3b82f6" 
+                  strokeWidth={3} 
+                  dot={{ fill: '#3b82f6', r: 6 }}
+                  name="Diastolisch"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            <p className="text-sm text-slate-500 mt-6 text-center">
+              Laatste {bloodPressureHistory.length} metingen
+            </p>
+          </section>
+        )}
 
-        {/* Historiek */}
-        <section className="space-y-8">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
-              <HeartPulse size={16} className="text-rose-500" /> Medische Brongegevens
-            </h3>
-          </div>
-          
-          <div className="grid gap-6">
-            {vitals.length > 0 ? vitals.map((v) => (
-              <div key={v.id} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex items-center justify-between group relative overflow-hidden transition-all hover:scale-[1.01]">
-                {/* Sync Badge */}
-                <div className="absolute top-6 right-8 flex items-center gap-2">
-                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-sm ${
-                    v.storage_status === 'synced' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'
-                  }`}>
-                    {v.storage_status === 'synced' ? <Shield size={10} /> : <Activity size={10} />}
-                    <span className="text-[9px] font-black uppercase tracking-widest">
-                      {v.storage_status === 'synced' ? 'Vault Secured' : 'Syncing...'}
-                    </span>
-                  </div>
-                </div>
+        {/* Medische Brongegevens */}
+        <section className="space-y-6">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 flex items-center gap-3">
+            <HeartPulse size={16} className="text-rose-500" />
+            Medische Brongegevens
+          </h3>
 
-                <div className="flex items-center gap-10">
-                  <div className={`h-16 w-16 rounded-[1.5rem] flex items-center justify-center ${
-                    v.systolic > 140 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'
-                  }`}>
-                    <Activity size={28} />
+          {groupedZibs.length === 0 ? (
+            <p className="text-center py-20 text-slate-400 italic">
+              Geen gegevens gevonden in uw persoonlijke kluis.
+            </p>
+          ) : (
+            groupedZibs.map(([category, items]) => (
+              <div key={category} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                <button
+                  onClick={() => toggleSection(category)}
+                  className="w-full px-8 py-6 flex items-center justify-between hover:bg-slate-50 transition"
+                >
+                  <div className="flex items-center gap-4">
+                    <ChevronDown
+                      size={20}
+                      className={`text-slate-500 transition-transform duration-300 ${openSections.has(category) ? 'rotate-180' : ''}`}
+                    />
+                    <h4 className="font-black text-lg tracking-tight">{category}</h4>
+                    <span className="text-sm font-medium text-slate-500">({items.length})</span>
                   </div>
-                  <div>
-                    <div className="flex items-baseline gap-1.5 leading-none">
-                      <span className="text-5xl font-black tracking-tighter">{v.systolic}</span>
-                      <span className="text-3xl text-slate-200 font-extralight">/</span>
-                      <span className="text-5xl font-black tracking-tighter">{v.diastolic}</span>
-                      <span className="text-[11px] font-black text-slate-300 ml-4 uppercase tracking-[0.2em]">mmHg</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-4">
-                      {new Date(v.recorded_at).toLocaleDateString('nl-NL', { day: '2-digit', month: 'long', year: 'numeric' })} • Node: local-vault-01
-                    </p>
+                </button>
+
+                {openSections.has(category) && (
+                  <div className="px-8 pb-8 space-y-6">
+                    {items.map((zib) => {
+                      const narrative = zib.content.narrative_text as string | undefined;
+
+                      return (
+                        <div key={zib.id} className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200">
+                          <div className="flex justify-between items-start mb-4">
+                            <p className="font-bold text-slate-800">
+                              {zib.zib_id.replace('nl.zorg.', '').replaceAll('.', ' ')}
+                            </p>
+                            <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
+                              zib.storage_status === 'local_vault_only' 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {zib.storage_status === 'local_vault_only' ? 'Alleen in vault' : 'Gesynchroniseerd'}
+                            </div>
+                          </div>
+
+                          {narrative && (
+                            <p className="text-slate-700 text-lg italic mb-4">&quot;{narrative}&quot;</p>
+                          )}
+
+                          <p className="text-xs text-slate-500">
+                            {format(new Date(zib.recorded_at), 'PPPp', { locale: nl })}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </div>
-            )) : (
-              <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-[4rem] bg-slate-50/50 italic font-bold text-slate-300 uppercase tracking-widest text-[10px]">
-                Geen gevalideerde metingen in kluis gevonden
-              </div>
-            )}
-          </div>
+            ))
+          )}
         </section>
       </main>
     </div>
