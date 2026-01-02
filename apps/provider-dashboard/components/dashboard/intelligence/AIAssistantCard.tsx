@@ -27,8 +27,16 @@ interface AIAssistantProps {
   mode: WorkflowMode;
 }
 
-export const AIAssistantCard = ({ observations = [], mode }: AIAssistantProps) => {
-  const theme = WORKFLOW_THEMES[mode];
+export const AIAssistantCard = ({ observations = [], mode = 'spreekuur' }: AIAssistantProps) => {
+  // Gebruik een fallback thema als de mode niet bestaat in de config
+  const theme = WORKFLOW_THEMES[mode] || WORKFLOW_THEMES['spreekuur'];
+
+  // Controleer of theme nu wel bestaat, anders een harde fallback object
+  const safeTheme = theme || { 
+    primary: 'bg-blue-600', 
+    secondary: 'text-blue-400', 
+    label: 'Standard' 
+  };
 
   // Type-safe extractie
   const latestBP = observations.find(o => o.zib_id === 'nl.zorg.Bloeddruk')?.content;

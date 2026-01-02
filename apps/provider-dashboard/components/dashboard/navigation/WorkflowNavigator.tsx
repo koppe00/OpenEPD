@@ -1,117 +1,131 @@
 'use client';
 
 import React from 'react';
-import { 
-  Users, 
-  ChevronRight, 
-  Search 
-} from 'lucide-react';
+import { Search, Clock, UserCheck, History, Calendar } from 'lucide-react';
 import { PatientProfile } from '../../../types';
-import { WorkflowMode, WORKFLOW_THEMES } from '@openepd/clinical-core';
 
 interface Props {
   patients: PatientProfile[];
-  viewMode: WorkflowMode;
+  viewMode: string;
   selectedId?: string;
-  onSelect: (patient: PatientProfile) => void;
+  onSelect: (p: PatientProfile) => void;
   searchTerm: string;
-  onSearchChange: (term: string) => void;
+  onSearchChange: (val: string) => void;
 }
 
-export const WorkflowNavigator = ({ 
+export function WorkflowNavigator({ 
   patients, 
   viewMode, 
   selectedId, 
-  onSelect,
-  searchTerm,
-  onSearchChange
-}: Props) => {
+  onSelect, 
+  searchTerm, 
+  onSearchChange 
+}: Props) {
   
-  const theme = WORKFLOW_THEMES[viewMode];
+  // 1. Filteren op de zoekterm die uit de props komt
+  const filtered = patients.filter(p => 
+    p.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // 2. Splitsen in 'Recent Bekeken' en 'Dagprogramma'
+  const recentPatients = filtered.filter(p => p.isRecent);
+  const worklistPatients = filtered.filter(p => !p.isRecent);
+
+  // Helper functie om de kaartjes te renderen
+  const renderPatientCard = (patient: PatientProfile) => {
+    // We casten naar any voor de velden die mogelijk nog niet 100% matchen met de basis interface
+    const p = patient as any; 
+    const isPresent = p.status === 'present';
+    const isSelected = selectedId === p.id;
+
+    return (
+      <button 
+        key={p.id}
+        onClick={() => onSelect(patient)}
+        className={`w-full p-4 flex items-center gap-4 border-b border-slate-50 transition-all text-left group ${
+          isSelected 
+            ? 'bg-blue-50 border-r-4 border-r-blue-600 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)]' 
+            : 'hover:bg-slate-50'
+        }`}
+      >
+        <div className="relative">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-[10px] uppercase transition-colors ${
+              isSelected ? 'bg-blue-600 text-white' : (isPresent ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400')
+          }`}>
+            {p.initials || p.first_name?.[0] || '?'}
+          </div>
+          
+          {/* Status indicator stip */}
+          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+            isPresent ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' : 'bg-slate-300'
+          }`} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start">
+              <p className={`text-[11px] font-black uppercase tracking-tight truncate transition-colors ${
+                  isSelected ? 'text-blue-700' : 'text-slate-800'
+              }`}>
+                  {p.full_name}
+              </p>
+              {isPresent && <UserCheck size={12} className="text-emerald-500 shrink-0" />}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                {p.date_of_birth || 'GEEN GEBOORTEDATUM'}
+            </p>
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="p-6 space-y-4">
-        <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={16} />
+      {/* Zoekbalk sectie */}
+      <div className="p-4 border-b border-slate-100">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
           <input 
             type="text"
+            placeholder="Lijst doorzoeken..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-[11px] font-bold text-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 transition-all"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={viewMode === 'spreekuur' ? "Zoek in agenda..." : "Zoek op afdeling..."}
-            className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-12 pr-4 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           />
-        </div>
-
-        <div className="flex items-center justify-between px-2">
-          <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 italic">
-            {viewMode === 'spreekuur' ? 'Wachtrij' : 'Beddenoverzicht'}
-          </span>
-          {viewMode === 'kliniek' && (
-            <div className="flex items-center gap-1">
-              <div className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Real-time</span>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
-        {patients.length > 0 ? (
-          patients.map((patient) => (
-            <button
-              key={patient.id}
-              onClick={() => onSelect(patient)}
-              className={`w-full text-left p-4 rounded-[1.5rem] transition-all duration-300 flex items-center justify-between group relative overflow-hidden ${
-                selectedId === patient.id 
-                  ? `${theme.primary} text-white shadow-xl translate-x-1` 
-                  : 'hover:bg-slate-50 text-slate-600'
-              }`}
-            >
-              <div className="flex items-center gap-4 relative z-10">
-                <div className={`p-2 rounded-xl transition-colors ${
-                  selectedId === patient.id ? 'bg-white/20' : 'bg-slate-100'
-                }`}>
-                  <Users size={18} className={selectedId === patient.id ? 'text-white' : 'text-slate-400'} />
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {/* SECTIE 1: RECENT BEKEKEN (MPI) */}
+        {recentPatients.length > 0 && (
+            <div className="bg-slate-50/30">
+                <div className="px-6 py-3 flex items-center gap-2 text-blue-500/70">
+                    <History size={11} className="stroke-[3px]" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">Recent Bekeken</span>
                 </div>
-                <div>
-                  <p className="text-xs font-black uppercase tracking-tight truncate max-w-[140px]">
-                    {patient.full_name}
-                  </p>
-                  <p className={`text-[9px] font-bold opacity-60 ${
-                    selectedId === patient.id ? 'text-white' : 'text-slate-400'
-                  }`}>
-                    {viewMode === 'spreekuur' ? `Consult: 14:00` : `Bed: K3-12`}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 relative z-10">
-                {viewMode === 'kliniek' && (
-                  <div className={`w-2 h-2 rounded-full ${
-                    patient.id.includes('1') ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400'
-                  }`} />
-                )}
-                <ChevronRight 
-                  size={14} 
-                  className={`transition-transform group-hover:translate-x-1 ${
-                    selectedId === patient.id ? 'text-white' : 'text-slate-300'
-                  }`} 
-                />
-              </div>
+                {recentPatients.map(renderPatientCard)}
+            </div>
+        )}
 
-              {selectedId === patient.id && (
-                <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
-              )}
-            </button>
-          ))
+        {/* SECTIE 2: STANDAARD WERKLIJST */}
+        <div className="px-6 py-3 flex items-center gap-2 text-slate-400 mt-2">
+            <Calendar size={11} className="stroke-[3px]" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                {viewMode === 'kliniek' ? 'Afdelingsoverzicht' : 'Poli Programma'}
+            </span>
+        </div>
+        
+        {worklistPatients.length > 0 ? (
+            worklistPatients.map(renderPatientCard)
         ) : (
-          <div className="py-12 flex flex-col items-center justify-center text-slate-300 opacity-50">
-            <Search size={24} className="mb-2" />
-            <p className="text-[9px] font-black uppercase tracking-widest">Geen resultaten</p>
-          </div>
+            <div className="p-10 text-center space-y-2">
+                <p className="text-[10px] text-slate-300 font-black uppercase tracking-widest italic">
+                    Geen geplande dossiers
+                </p>
+            </div>
         )}
       </div>
     </div>
   );
-};
+}

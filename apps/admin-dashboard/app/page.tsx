@@ -1,8 +1,13 @@
-import { ShieldCheck, Activity, Users, Database, Cpu, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { 
+  ShieldCheck, Activity, Users, Database, Cpu, ArrowRight,
+  LayoutTemplate, Component, FileText, Settings
+} from 'lucide-react';
 
 export default function AdminDashboard() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header */}
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Systeem Overzicht</h1>
@@ -17,6 +22,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* KPI Kaarten */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatusCard title="Actieve Sessies" value="142" sub="12 Zorgverleners" icon={Users} color="bg-blue-500" />
         <StatusCard title="AI Requests (24u)" value="1.204" sub="Gemini Pro 1.5" icon={Cpu} color="bg-purple-500" />
@@ -24,6 +30,38 @@ export default function AdminDashboard() {
         <StatusCard title="Audit Integriteit" value="100%" sub="NEN7513 Compliant" icon={ShieldCheck} color="bg-slate-800" />
       </div>
 
+      {/* NIEUW: Snelle Navigatie naar Configuratie */}
+      <div>
+        <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <Settings size={18} className="text-slate-400" />
+            Beheer & Inrichting
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <ConfigCard 
+                title="UI Templates" 
+                desc="Beheer layouts voor poli, kliniek en admin." 
+                icon={LayoutTemplate} 
+                href="/ui-config/templates" // Zorg dat deze route bestaat
+                color="text-blue-600 bg-blue-50"
+            />
+            <ConfigCard 
+                title="Widget Architect" 
+                desc="Configureer ZIB-blokken en procesmodules." 
+                icon={Component} 
+                href="/ui-config/widgets" // Zorg dat deze route bestaat
+                color="text-purple-600 bg-purple-50"
+            />
+            <ConfigCard 
+                title="Klinische Protocollen" 
+                desc="Beheer beslisregels en zorgpaden." 
+                icon={FileText} 
+                href="/clinical/protocols" 
+                color="text-emerald-600 bg-emerald-50"
+            />
+        </div>
+      </div>
+
+      {/* Logs & Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
           <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
@@ -69,6 +107,8 @@ export default function AdminDashboard() {
   );
 }
 
+// --- HULP COMPONENTEN ---
+
 function StatusCard({ title, value, sub, icon: Icon, color }: any) {
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-start justify-between group hover:shadow-md transition-all">
@@ -82,6 +122,21 @@ function StatusCard({ title, value, sub, icon: Icon, color }: any) {
       </div>
     </div>
   );
+}
+
+function ConfigCard({ title, desc, icon: Icon, href, color }: any) {
+    return (
+        <Link href={href} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:border-blue-400 hover:shadow-md transition-all group flex items-center gap-4">
+            <div className={`p-3 rounded-2xl ${color}`}>
+                <Icon size={24} />
+            </div>
+            <div>
+                <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{title}</h4>
+                <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
+            </div>
+            <ArrowRight size={16} className="ml-auto text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all" />
+        </Link>
+    );
 }
 
 function SystemMetric({ label, value }: any) {

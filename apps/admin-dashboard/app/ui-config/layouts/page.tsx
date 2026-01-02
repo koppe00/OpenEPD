@@ -99,6 +99,7 @@ export default function LayoutManager() {
   const [currentLayout, setCurrentLayout] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+console.log("DEBUG - URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   // DND Sensors
   const sensors = useSensors(

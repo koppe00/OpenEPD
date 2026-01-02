@@ -2,33 +2,27 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Lock, Database, Info, Settings, CheckCircle2 } from 'lucide-react';
+import { Lock, Database, Info, Settings, CheckCircle2, Loader2 } from 'lucide-react';
 import { ZIB_CONFIG } from '@openepd/clinical-core';
 import { ClinicalObservation } from '@/hooks/useClinicalData';
 import { useRouter } from 'next/navigation';
+import { SectionDataRenderer } from '../UniversalZibWidget';
+import { WidgetSection } from '@/hooks/useDashboardLayout';
 
 type ExtendedObservation = ClinicalObservation & {
   value?: Record<string, unknown>; 
   value_quantity?: { value: number; unit: string };
 };
 
-interface WidgetSection {
-  id: string;
-  label: string;
-  section_key: string;
-  zib_mapping: string;
-  ui_control_type: 'text_area' | 'measurement_group' | 'checklist';
-  placeholder: string;
-  selected_fields?: string[];
-}
-
+// 1. Voeg layoutSections toe aan de Interface
 interface SmartTemplateEditorProps {
   observations?: ClinicalObservation[];
   mode?: string;
   allowedZibs?: string[];
   embedded?: boolean;
   patientId?: string;
-  onSaveSuccess?: () => void; // <--- De nieuwe callback prop
+  onSaveSuccess?: () => void;
+  layoutSections?: WidgetSection[]; // <--- Dit gebruikt nu de geimporteerde versie
 }
 
 export const SmartTemplateEditor = ({ 
@@ -36,14 +30,17 @@ export const SmartTemplateEditor = ({
   embedded, 
   allowedZibs, 
   patientId,
-  onSaveSuccess 
+  onSaveSuccess,
+  layoutSections = [] 
 }: SmartTemplateEditorProps) => {
-  const [sections, setSections] = useState<WidgetSection[]>([]);
-  const [loading, setLoading] = useState(true);
   
-  // Strict typing voor form data
+  // 1. Lokale state voor secties en succes-status
+  const [sections, setSections] = useState<WidgetSection[]>(layoutSections);
+  // Initialiseer loading op true als we nog geen secties hebben
+  const [loading, setLoading] = useState(layoutSections.length === 0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  
   const [formData, setFormData] = useState<Record<string, string | number | boolean>>({});
-  
   const [saving, setSaving] = useState(false);
   const router = useRouter();
   
@@ -52,37 +49,27 @@ export const SmartTemplateEditor = ({
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
 
-  useEffect(() => {
-    async function fetchBlueprint() {
-      const { data: widgetDef } = await supabase
-        .from('widget_definitions')
-        .select('id')
-        .eq('component_key', 'SmartTemplateEditor')
-        .single();
+  // 2. Synchroniseer secties wanneer layoutSections (uit de database join) binnenkomt
 
-      if (widgetDef) {
-        const query = supabase
-          .from('widget_sections')
-          .select('*')
-          .eq('widget_definition_id', widgetDef.id)
-          .order('sort_order');
+useEffect(() => {
+  if (layoutSections && layoutSections.length > 0) {
+    // OPTIE A: Laat ALLES zien wat in de architect staat (Aanbevolen)
+    setSections(layoutSections);
+    setLoading(false);
+    
+    /* OPTIE B: Alleen filteren als je echt specifiek widgets wilt beperken, 
+    maar voor nu is dit vaak de reden dat je 'Geen secties' ziet:
+    const filtered = allowedZibs && allowedZibs.length > 0
+      ? layoutSections.filter(sec => sec.zib_mapping && allowedZibs.includes(sec.zib_mapping))
+      : layoutSections;
+    setSections(filtered);
+    */
+  } else if (layoutSections) {
+    setLoading(false);
+  }
+}, [layoutSections]); // Haal allowedZibs uit de dependency als je Optie A kiest
 
-        const { data: s } = await query;
-        
-        if (s) {
-          const filtered = allowedZibs 
-            ? s.filter(sec => sec.zib_mapping && allowedZibs.includes(sec.zib_mapping))
-            : s;
-          setSections(filtered);
-        }
-      }
-      setLoading(false);
-    }
 
-    fetchBlueprint();
-  }, [supabase, allowedZibs]);
-
-  // --- OPSLAAN LOGICA ---
   const handleSave = async () => {
     if (!patientId) {
         alert("Geen patiënt geselecteerd.");
@@ -93,10 +80,9 @@ export const SmartTemplateEditor = ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const entriesToSave: Record<string, any> = {};
 
-    // 1. Gestructureerde inputs
+    // 1. Gestructureerde & Vrije tekst velden verzamelen
     Object.entries(formData).forEach(([key, value]) => {
         const lastDotIndex = key.lastIndexOf('.');
         if (lastDotIndex === -1) return; 
@@ -121,7 +107,7 @@ export const SmartTemplateEditor = ({
         }
     });
 
-    const rows = Object.entries(entriesToSave).map(([zibId, content]) => ({
+  const rows = Object.entries(entriesToSave).map(([zibId, content]) => ({
         patient_id: patientId,
         caregiver_id: user.id,
         zib_id: zibId,
@@ -137,14 +123,10 @@ export const SmartTemplateEditor = ({
         const { error } = await supabase.from('zib_compositions').insert(rows);
         if (!error) {
             setFormData({}); 
-            
-            // CRUCIAAL: Roep de refresh callback aan
+            setShowSuccess(true); // Toon de checkmark
             if (onSaveSuccess) onSaveSuccess();
-            
-            // Router refresh voor de zekerheid
-            router.refresh(); 
+            setTimeout(() => setShowSuccess(false), 3000); // Verberg na 3 sec
         } else {
-            console.error("Save Error", error);
             alert("Fout bij opslaan: " + error.message);
         }
     }
@@ -212,66 +194,69 @@ export const SmartTemplateEditor = ({
     );
   };
 
-  if (loading) return <div>Laden...</div>;
-
+  // 3. Verbeterde Loading State (Gebruikersvriendelijker)
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-20 text-slate-400">
+        <Loader2 className="animate-spin mb-4" size={32} />
+        <p className="text-[10px] font-black uppercase tracking-widest animate-pulse">
+          Consult-notities laden...
+        </p>
+      </div>
+    );
+  }
   return (
     <div className={`flex flex-col bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden ${embedded ? 'h-full' : ''}`}>
+      {/* Header */}
       <div className="p-4 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center px-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-blue-600"><Lock size={14} /></div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Smart Editor {allowedZibs ? '(Filtered)' : ''}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Smart Editor</span>
         </div>
-        <div className="flex items-center gap-4"><span className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full uppercase">Autosave Active</span></div>
+        <div className="flex items-center gap-4">
+           {showSuccess && (
+             <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase animate-in fade-in slide-in-from-right-4">
+               <CheckCircle2 size={14} /> Opgeslagen
+             </div>
+           )}
+           <span className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full uppercase">Live Sync</span>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
-        {sections.length > 0 ? sections.map((section) => (
-          <div key={section.id} className="group space-y-4">
-            <div className="flex justify-between items-center px-1 border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-black uppercase tracking-[0.15em] text-slate-800">{section.label}</label>
-                {section.zib_mapping && (
-                  <div className="group/zib relative"><Database size={12} className="text-blue-300 cursor-help" /></div>
-                )}
-              </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-16 custom-scrollbar">
+          {sections.length > 0 ? sections.map((section) => (
+            <div key={section.id} className="relative">
+              {/* We gebruiken de rijke renderer die inzicht & invoer combineert */}
+              <SectionDataRenderer 
+                key={section.id} 
+                  section={section} 
+                  observations={observations} // Zorg dat dit de volledige array van 41 stuks is
+                  patientId={patientId}
+                  onDataChange={onSaveSuccess}
+                  mode="journal"
+                    />
+                  </div>
+                )) : (
+            <div className="h-full flex flex-col items-center justify-center text-center py-20">
+              <Settings size={32} className="text-slate-200 mb-4" />
+              <p className="text-xs font-bold text-slate-400 uppercase">Geen secties geconfigureerd</p>
             </div>
-            <div className="grid grid-cols-12 gap-6">
-                <div className={`${(section.selected_fields?.length || 0) > 0 ? 'col-span-7' : 'col-span-12'}`}>
-                     <div className="relative h-full">
-                        <textarea
-                        value={(formData[section.section_key] as string) || ''}
-                        onChange={(e) => setFormData({...formData, [section.section_key]: e.target.value})}
-                        placeholder={section.placeholder}
-                        className="w-full p-4 rounded-2xl bg-slate-50 border border-transparent focus:border-blue-100 focus:bg-white outline-none transition-all text-sm leading-relaxed text-slate-700 min-h-[120px] resize-none shadow-inner h-full"
-                        />
-                    </div>
-                </div>
-                {section.selected_fields && section.selected_fields.length > 0 && section.zib_mapping && (
-                    <div className="col-span-5 bg-blue-50/30 rounded-2xl p-4 border border-blue-100/50">
-                        <div className="mb-3 flex items-center gap-2">
-                            <Info size={12} className="text-blue-400" />
-                            <span className="text-[9px] font-black uppercase text-blue-400 tracking-wider">Gestructureerde Data</span>
-                        </div>
-                        <div className="space-y-3">
-                            {section.selected_fields.map(fieldName => renderZibField(section.zib_mapping!, fieldName))}
-                        </div>
-                    </div>
-                )}
-            </div>
-          </div>
-        )) : (
-          <div className="h-full flex flex-col items-center justify-center text-center py-20"><Settings size={32} className="text-slate-200 mb-4" /><p className="text-xs font-bold text-slate-400 uppercase">Geen secties</p></div>
-        )}
-      </div>
+          )}
+        </div>
 
+{/* Footer */}
       <div className="p-6 border-t border-slate-50 bg-white px-8 flex justify-end gap-3">
-         <button disabled={saving} className="px-6 py-3 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-colors">Concept opslaan</button>
+         <button className="px-6 py-3 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Concept</button>
          <button 
             onClick={handleSave} 
             disabled={saving}
-            className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all flex items-center gap-2 disabled:opacity-50"
+            className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-xl ${
+              showSuccess ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-blue-600'
+            }`}
          >
-            {saving ? 'Verwerken...' : <><CheckCircle2 size={14} /> Valideren & Publiceren</>}
+            {saving ? <Loader2 className="animate-spin" size={14} /> : showSuccess ? <CheckCircle2 size={14} /> : <CheckCircle2 size={14} />}
+            {saving ? 'Verwerken...' : showSuccess ? 'Gepubliceerd' : 'Valideren & Publiceren'}
          </button>
       </div>
     </div>

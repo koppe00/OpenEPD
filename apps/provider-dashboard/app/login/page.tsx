@@ -1,19 +1,20 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore, useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { createBrowserClient } from '@supabase/ssr';
 import { Shield, Activity } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // Importeer de router
 
-// Hulpmiddelen voor useSyncExternalStore om te detecteren of we in de browser zijn
+// Hulpmiddelen voor useSyncExternalStore
 const subscribe = () => () => {}; 
-const getSnapshot = () => window.location.origin;
+const getSnapshot = () => typeof window !== 'undefined' ? window.location.origin : '';
 const getServerSnapshot = () => '';
 
 export default function LoginPage() {
-  // Dit is de 'officiële' manier van React om te synchroniseren met window/DOM
-  // zonder setState() te gebruiken in een useEffect.
+  const router = useRouter();
+  
   const origin = useSyncExternalStore(
     subscribe,
     getSnapshot,
@@ -24,6 +25,19 @@ export default function LoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ), []);
+
+  // --- DE FIX: Luister naar statusverandering ---
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Zodra de gebruiker is ingelogd, sturen we hem direct naar de root (dashboard)
+        router.push('/');
+        router.refresh(); // Forceert een refresh van server components (zoals middleware)
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
@@ -37,7 +51,6 @@ export default function LoginPage() {
           <p className="text-slate-400 text-sm font-medium mt-1">Toegang tot uw soeverein dossier</p>
         </div>
 
-        {/* Als origin een waarde heeft (dus we zijn in de browser), toon de Auth component */}
         {origin ? (
           <Auth
             supabaseClient={supabase}
@@ -57,6 +70,7 @@ export default function LoginPage() {
               }
             }}
             providers={[]}
+            // redirectTo blijft hier staan voor e-mail verificatie links
             redirectTo={`${origin}/`}
           />
         ) : (

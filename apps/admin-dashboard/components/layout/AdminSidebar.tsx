@@ -12,7 +12,9 @@ import {
   ShieldAlert, 
   Database, 
   Cpu,
-  LayoutTemplate
+  LayoutTemplate,
+  Component, // Nieuwe import voor het widget icoon
+  Network // Voor layouts/algemeen
 } from 'lucide-react';
 
 const menuItems = [
@@ -24,11 +26,14 @@ const menuItems = [
     ]
   },
   {
-    category: 'Klinische Configuratie',
+    category: 'Inrichting & UI',
     items: [
+      // 1. Hier heb ik de link aangepast naar de templates pagina die we gefixt hebben
+      { label: 'Dashboard Templates', href: '/ui-config/templates', icon: LayoutTemplate },
+      // 2. Deze is nieuw: Direct naar de Widget Architect
+      { label: 'Widget Architect', href: '/ui-config/widgets', icon: Component },
       { label: 'Protocollen (GLM)', href: '/clinical/protocols', icon: Stethoscope },
-      { label: 'Smart Templates', href: '/documentation/templates', icon: FileText },
-      { label: 'UI & Widgets', href: '/ui-config/layouts', icon: LayoutTemplate },
+      { label: 'Documentatie', href: '/documentation/templates', icon: FileText },
     ]
   },
   {
@@ -47,6 +52,7 @@ export const AdminSidebar = () => {
 
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen border-r border-slate-800 shrink-0">
+      {/* Header Logo */}
       <div className="p-6 border-b border-slate-800 flex items-center gap-3">
         <div className="bg-blue-600 p-2 rounded-lg text-white shadow-lg shadow-blue-900/20">
           <Settings size={20} />
@@ -57,7 +63,8 @@ export const AdminSidebar = () => {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-8">
+      {/* Navigatie Items */}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
         {menuItems.map((group, idx) => (
           <div key={idx}>
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 px-3">
@@ -65,7 +72,12 @@ export const AdminSidebar = () => {
             </h3>
             <div className="space-y-1">
               {group.items.map((item) => {
-                const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+                // Check of de link actief is. 
+                // We kijken of de pathname BEGINT met de href (behalve voor home '/')
+                const isActive = item.href === '/' 
+                  ? pathname === '/' 
+                  : pathname.startsWith(item.href);
+
                 return (
                   <Link 
                     key={item.href} 
@@ -86,6 +98,7 @@ export const AdminSidebar = () => {
         ))}
       </nav>
 
+      {/* Footer User Info */}
       <div className="p-4 border-t border-slate-800 bg-slate-900/50">
         <div className="flex items-center gap-3 px-2">
           <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white border border-slate-600">

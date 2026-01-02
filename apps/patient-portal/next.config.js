@@ -1,26 +1,7 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const path = require('path');
-const fs = require('fs');
-const dotenv = require('dotenv');
-
-// Functie om .env uit de root te laden
-function loadRootEnv() {
-  const rootEnvPath = path.join(__dirname, '../../.env');
-  
-  if (fs.existsSync(rootEnvPath)) {
-    const envConfig = dotenv.parse(fs.readFileSync(rootEnvPath));
-    for (const k in envConfig) {
-      process.env[k] = envConfig[k];
-    }
-  }
-}
-
-loadRootEnv();
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  transpilePackages: ['@supabase/supabase-js'], 
+  // Zorg dat de moderne Supabase packages goed werken
+  transpilePackages: ['@supabase/ssr', '@supabase/supabase-js'],
 };
 
 module.exports = nextConfig;
