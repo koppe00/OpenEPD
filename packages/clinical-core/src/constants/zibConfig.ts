@@ -1291,5 +1291,30 @@ export const ZIB_CONFIG: Record<string, ZibField[]> = {
   'nl.zorg.Decursus': [
     { name: 'progress_note', label: 'Decursus', type: 'text', placeholder: 'Voortgangsverslag...' },
     { name: 'contact_type', label: 'Type Contact', type: 'select', options: [{value: 'visit', label: 'Fysiek Consult'}, {value: 'call', label: 'Telefonisch'}, {value: 'e-consult', label: 'E-Consult'}] }
+  ],
+
+  'nl.zorg.PoliklinischConsult': [
+    { name: 'anamnese', label: 'Anamnese', type: 'text', placeholder: 'Klachten en voorgeschiedenis...' },
+    { name: 'lichamelijk_onderzoek', label: 'Lichamelijk Onderzoek', type: 'text', placeholder: 'Bevindingen...' },
+    { name: 'aanvullend_onderzoek', label: 'Aanvullend Onderzoek', type: 'text', placeholder: 'Labs, imaging...' },
+    { name: 'conclusie', label: 'Conclusie', type: 'text', placeholder: 'Diagnose en interpretatie...' },
+    { name: 'beleid', label: 'Beleid', type: 'text', placeholder: 'Behandelplan...' },
+    { name: 'specialisme', label: 'Specialisme', type: 'text', placeholder: 'bijv. Cardiologie' },
+    { name: 'contact_type', label: 'Type Consult', type: 'select', options: [
+      { value: 'Eerste poliklinisch consult', label: 'Eerste poliklinisch consult' },
+      { value: 'Vervolg consult', label: 'Vervolg consult' },
+      { value: 'Dagbehandeling', label: 'Dagbehandeling' },
+      { value: 'Telefonisch consult', label: 'Telefonisch consult' }
+    ]},
+    { name: 'consult_date', label: 'Consult Datum', type: 'datetime' }
+  ],
+
+  'nl.zorg.DBCDeclaratie': [
+    { name: 'dbc_code', label: 'DBC Code', type: 'text', placeholder: 'bijv. 0302-03000-0100001' },
+    { name: 'care_type', label: 'Zorgtype', type: 'text', placeholder: 'Eerste consult / Vervolg' },
+    { name: 'icd10_codes', label: 'ICD-10 Codes', type: 'text', placeholder: 'Komma gescheiden, bijv. I10, E11.9' },
+    { name: 'procedures', label: 'Verrichtingen', type: 'text', placeholder: 'Komma gescheiden' },
+    { name: 'consult_date', label: 'Datum', type: 'datetime' },
+    { name: 'duration_minutes', label: 'Duur', type: 'number', unit: 'minuten' }
   ]
 }

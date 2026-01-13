@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, User, Calendar, MapPin, Loader2, ArrowRight, X } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export function GlobalPatientSearch({ isOpen, onClose, onSelect }: { isOpen: boolean, onClose: () => void, onSelect: (patient: any) => void }) {
@@ -11,10 +11,7 @@ export function GlobalPatientSearch({ isOpen, onClose, onSelect }: { isOpen: boo
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   const handleSearch = async (val: string) => {
     setQuery(val);

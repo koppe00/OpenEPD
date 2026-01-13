@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://openepd.org/bpmn">
+  <bpmn:process id="acs-process" name="ACS Protocol" isExecutable="true">
+    <bpmn:startEvent id="startChestPain" name="Patiënt meldt pijn" />
+    <bpmn:serviceTask id="intakeTask" name="Snelle Intake" />
+    <bpmn:serviceTask id="orderECG" name="ECG Aanvragen" />
+    <bpmn:exclusiveGateway id="checkECG" name="ST-elevatie?" />
+    <bpmn:serviceTask id="planPCI" name="PCI Plannen" />
+    <bpmn:endEvent id="end" />
+
+    <bpmn:sequenceFlow id="f1" sourceRef="startChestPain" targetRef="intakeTask" />
+    <bpmn:sequenceFlow id="f2" sourceRef="intakeTask" targetRef="orderECG" />
+    <bpmn:sequenceFlow id="f3" sourceRef="orderECG" targetRef="checkECG" />
+    <bpmn:sequenceFlow id="f4" sourceRef="checkECG" targetRef="planPCI" />
+    <bpmn:sequenceFlow id="f5" sourceRef="planPCI" targetRef="end" />
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { 
   User, ArrowLeft, MapPin, Phone, Mail, 
   ShieldAlert, FolderLock, ExternalLink, Loader2, Save, Fingerprint, CheckCircle2
@@ -16,10 +16,7 @@ export default function PatientDossierPage({ params }: any) {
   const [patientId, setPatientId] = useState<string | null>(null);
   const [hasRelationship, setHasRelationship] = useState<boolean | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
     params.then((unwrapped: any) => setPatientId(unwrapped.id));

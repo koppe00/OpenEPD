@@ -5,7 +5,7 @@ import { ZIB_CONFIG } from '@openepd/clinical-core';
 import { 
   Activity, Edit3, Save, Calendar, User, ChevronRight, Plus, Loader2 
 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { DashboardWidget, WidgetSection } from '@/hooks/useDashboardLayout';
 import { ClinicalObservation } from '@/hooks/useClinicalData';
 import { ZibValidationService } from '@openepd/clinical-core';
@@ -16,6 +16,10 @@ import { AIAssistantWidget } from './ai/AIAssistantWidget';
 import { ReferralInboxWidget } from './admin/ReferralInboxWidget';
 import { AppointmentSchedulerWidget } from './admin/AppointmentSchedulerWidget';
 import { PatientRegistrationWidget } from './admin/PatientRegistrationWidget';
+import { VoiceAssistantWidget } from './intelligence/VoiceAssistantWidget';
+import { ReviewConsoleModal } from './intelligence/ReviewConsoleModal';
+import { GuidelineCheck } from './intelligence/GuidelineCheck';
+import { ConsentStatus } from './intelligence/ConsentStatus';
 
 interface Props {
   widget: DashboardWidget;
@@ -30,6 +34,10 @@ export function UniversalZibWidget(props: Props) {
   const { widget, observations = [], patientId, onViewDetail, onDataChange, onAddMeasurement } = props;
   const definition = widget.definition;
   
+  // State for VoiceAssistant review modal
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewData, setReviewData] = useState<any>(null);
+  
   // HIER ZIT DE SLEUTEL: We kijken nu naar het database veld 'engine_type'
   // In je SQL script is dit 'form', 'list', 'admin_scheduler', etc.
   const engine_type = definition?.engine_type || (widget as any).engine_type;
@@ -43,10 +51,64 @@ export function UniversalZibWidget(props: Props) {
   if (engine_type === 'admin_referral_list') return <ReferralInboxWidget />;
   if (engine_type === 'admin_scheduler') return <AppointmentSchedulerWidget />;
 
-  // 2. AI COPILOT (Blijft hetzelfde)
+  // 2. AI COPILOT (Met AI enable/disable check)
   if (engine_type === 'ai_copilot') {
-    const targetZibs = (configuration?.zibs as string[]) || []; 
-    return <AIAssistantWidget observations={observations} monitoredZibs={targetZibs} patientId={patientId} />;
+    const targetZibs = (configuration?.zibs as string[]) || [];
+    // Check localStorage for AI toggle state (same as AIInsightsModule)
+    const aiEnabled = typeof window !== 'undefined' 
+      ? localStorage.getItem('aiInsightsEnabled') !== 'false'
+      : true;
+    
+    return <AIAssistantWidget 
+      observations={observations} 
+      monitoredZibs={targetZibs} 
+      patientId={patientId}
+      aiEnabled={aiEnabled}
+    />;
+  }
+
+  // 3. VOICE ASSISTANT (Speech-to-ZIB)
+  if (engine_type === 'voice_assistant' || engine_type === 'speech_to_zib') {
+    return (
+      <>
+        <VoiceAssistantWidget
+          patientId={patientId}
+          onProcessComplete={(extractionId) => {
+            console.log('Voice extraction completed:', extractionId);
+            if (onDataChange) onDataChange();
+          }}
+          onOpenReview={(data) => {
+            setReviewData(data);
+            setIsReviewModalOpen(true);
+          }}
+        />
+        
+        <ReviewConsoleModal
+          isOpen={isReviewModalOpen}
+          onClose={() => {
+            setIsReviewModalOpen(false);
+            setReviewData(null);
+          }}
+          extractionData={reviewData}
+          patientId={patientId}
+          onConfirm={() => {
+            if (onDataChange) onDataChange();
+            setIsReviewModalOpen(false);
+            setReviewData(null);
+          }}
+        />
+      </>
+    );
+  }
+
+  // 4. GUIDELINE CHECK (Intelligence)
+  if (engine_type === 'guideline_check') {
+    return <GuidelineCheck observations={observations} />;
+  }
+
+  // 5. CONSENT STATUS (Toestemmingsbeheer)
+  if (engine_type === 'consent_status' || engine_type === 'toestemmingsbeheer') {
+    return <ConsentStatus />;
   }
 
   // ===========================================================================
@@ -56,10 +118,10 @@ export function UniversalZibWidget(props: Props) {
   // ===========================================================================
   if (engine_type === 'form') {
     return (
-      <div className="h-full flex flex-col bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-6 px-4">
-          <Edit3 size={16} className="text-blue-500" />
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">{display_title}</h3>
+      <div className="h-full flex flex-col bg-white rounded-lg p-2 sm:p-3 shadow border border-slate-300">
+        <div className="flex items-center gap-1.5 mb-2 sm:mb-3 px-1 sm:px-2 pb-2 border-b-2 border-blue-600">
+          <Edit3 size={12} className="text-blue-600" />
+          <h3 className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wide text-slate-700">{display_title}</h3>
         </div>
         
         {/* De SmartTemplateEditor handelt de secties af in 'Journal' mode */}
@@ -81,17 +143,17 @@ export function UniversalZibWidget(props: Props) {
   // ===========================================================================
   if (engine_type === 'list') {
     return (
-      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm h-full flex flex-col p-5 hover:border-blue-300 transition-all overflow-hidden">
-        <div className="flex justify-between items-center mb-6 px-1">
-           <div className="flex items-center gap-2">
-             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-               <Activity size={16} />
+      <div className="bg-white rounded-lg border border-slate-300 shadow h-full flex flex-col p-2 hover:border-blue-400 transition-all overflow-hidden">
+        <div className="flex justify-between items-center mb-2 pb-2 border-b-2 border-blue-600">
+           <div className="flex items-center gap-1.5">
+             <div className="p-1 bg-blue-600 text-white rounded">
+               <Activity size={12} />
              </div>
-             <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">{display_title}</h3>
+             <h3 className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wide text-slate-700">{display_title}</h3>
            </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 space-y-2 custom-scrollbar">
            {sections.length > 0 ? sections.map((section) => (
               <SectionDataRenderer 
                 key={section.id || section.section_key} 
@@ -137,10 +199,7 @@ export function SectionDataRenderer({
   const [isSaving, setIsSaving] = useState(false);
   const [showFullHistory, setShowFullHistory] = useState(false);
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   // Historie filteren en sorteren
 const history = observations
@@ -324,7 +383,7 @@ const formatMedicalText = (obs: any) => {
 
   // --- WEERGAVE B: JOURNAL (Voor Consultvoering / Data Invoer) ---
   return (
-    <div className="mb-12 group animate-in fade-in slide-in-from-bottom-2">
+    <div className="mb-1 group animate-in fade-in slide-in-from-bottom-2">
       {/* Header met vandaag-indicatie */}
       <div className="flex items-center gap-3 mb-4 px-1">
         <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-800">{section.label}</h3>
@@ -362,15 +421,15 @@ const formatMedicalText = (obs: any) => {
       </div>
 
       {/* Rijke Historie Tijdlijn */}
-      <div className="space-y-2 pl-6 border-l-2 border-slate-50 ml-2">
+      <div className="pl-3 border-l-2 border-slate-50 ml">
         {history.length > 0 ? (
           history.slice(0, showFullHistory ? 10 : 3).map((obs: any) => (
             <div key={obs.id} className="relative group/item">
               {/* In de loop van je historie tijdlijn (Journal mode) */}
-<div className="space-y-2">
-  <div className="flex justify-between items-start gap-4">
-    <div className="flex-1 space-y-2"> {/* Container voor tekst + gestructureerde data */}
-      
+              <div>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1"> {/* Container voor tekst + gestructureerde data */}
+                    
       {/* 1. De Vrije Tekst (het verhaal) */}
       <p className="text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
         {(() => {
@@ -446,7 +505,8 @@ const formatMedicalText = (obs: any) => {
         {history.length > 3 && !showFullHistory && (
           <button 
             onClick={() => setShowFullHistory(true)} 
-            className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em] pt-2 hover:text-blue-700 transition-colors ml-2"
+            className="text-[8px] font-bold text-blue-500 uppercase tracking-tight hover:text-blue-700 transition-colors ml-1"
+            style={{marginTop: '0px', marginBottom: '0px', paddingBottom: '0px', lineHeight: '1'}}
           >
             + Toon volledige historie ({history.length - 3} meer)
           </button>

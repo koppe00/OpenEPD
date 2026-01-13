@@ -146,7 +146,8 @@ export class ZibValidationService {
       'request_date', 'administration_time', 'agreement_date', 'birth_date', 
       'contact_date_time', 'admission_date_time', 'discharge_date_time', 'date_time', 
       'assessment_date', 'request_date_time', 'collection_date_time', 
-      'registration_date_time', 'start_date_time', 'end_date_time'
+      'registration_date_time', 'start_date_time', 'end_date_time', 'consult_date',
+      'examination_date', 'follow_up_date', 'diagnosis_date', 'observation_date'
     ];
 
     dateFields.forEach(key => {

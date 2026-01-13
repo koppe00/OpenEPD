@@ -3,9 +3,10 @@
 import { useMemo, useSyncExternalStore, useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { Shield, Activity } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // Importeer de router
+import { useRouter } from 'next/navigation';
+import type { Session } from '@supabase/supabase-js';
 
 // Hulpmiddelen voor useSyncExternalStore
 const subscribe = () => () => {}; 
@@ -21,14 +22,11 @@ export default function LoginPage() {
     getServerSnapshot
   );
 
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  const supabase = getSupabaseBrowserClient();
 
   // --- DE FIX: Luister naar statusverandering ---
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: Session | null) => {
       if (event === 'SIGNED_IN' && session) {
         // Zodra de gebruiker is ingelogd, sturen we hem direct naar de root (dashboard)
         router.push('/');

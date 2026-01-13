@@ -1,0 +1,17 @@
+{
+  "name": "projection-service",
+  "version": "0.1.0",
+  "private": true,
+  "main": "project-vitals.ts",
+  "scripts": {
+    "start:kafka": "ts-node src/kafka-consumer.ts"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  },
+  "devDependencies": {
+    "ts-node": "^10",
+    "typescript": "^5",
+    "@types/node": "^20"
+  }
+}

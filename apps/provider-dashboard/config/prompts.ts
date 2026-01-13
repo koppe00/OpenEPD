@@ -1,5 +1,5 @@
 export const AI_CONFIG = {
-  model: "gemini-2.5-flash-lite", // Dit model staat in je lijst!
+  model: "gemini-2.5-flash", // Latest Gemini 2.5 stable
   temperature: 0.2,
   maxOutputTokens: 500, 
 };

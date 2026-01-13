@@ -5,8 +5,29 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Save, Trash2, Settings2, 
-  LayoutTemplate, AlertTriangle, ExternalLink, Move
+  LayoutTemplate, AlertTriangle, ExternalLink, GripVertical
 } from 'lucide-react';
+
+// DND Kit Imports
+import {
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface WidgetInstance {
   id?: string;
@@ -19,6 +40,99 @@ interface WidgetInstance {
 
 interface PageProps {
   params: { id: string };
+}
+
+// Sortable Widget Component
+function SortableWidget({ 
+  widget, 
+  index, 
+  onUpdate, 
+  onRemove, 
+  router 
+}: { 
+  widget: WidgetInstance & { originalIndex: number }, 
+  index: number,
+  onUpdate: (index: number, title: string) => void,
+  onRemove: (index: number) => void,
+  router: any
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: widget.originalIndex.toString() });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : 'auto',
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className={`bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm group transition-all ${
+        isDragging ? 'shadow-2xl ring-2 ring-blue-500 scale-105' : 'hover:shadow-md'
+      }`}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-3">
+          <div 
+            {...attributes} 
+            {...listeners} 
+            className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-blue-50 rounded transition-colors"
+            title="Sleep om te verplaatsen"
+          >
+            <GripVertical size={16} className="text-slate-300 hover:text-blue-500 transition-colors" />
+          </div>
+          <div>
+            <input 
+              className="font-black text-sm text-slate-900 bg-transparent outline-none focus:text-blue-600 placeholder:text-slate-300"
+              placeholder={widget.definition?.name}
+              value={widget.display_title}
+              onChange={(e) => onUpdate(widget.originalIndex, e.target.value)}
+            />
+            <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">
+              Bron: {widget.definition?.name}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-1">
+          <button 
+            onClick={() => router.push(`/ui-config/widgets/${widget.widget_definition_id}`)}
+            className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all"
+            title="Open Architect"
+          >
+            <Settings2 size={16} />
+          </button>
+          <button 
+            onClick={() => onRemove(widget.originalIndex)} 
+            className="p-2 text-slate-300 hover:text-rose-500 rounded-full"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Live Blauwdruk</span>
+        </div>
+        <button 
+          onClick={() => router.push(`/ui-config/widgets/${widget.widget_definition_id}`)}
+          className="text-[9px] font-black text-blue-600 flex items-center gap-1 hover:underline"
+        >
+          CONFIG <ExternalLink size={10} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function TemplateBuilder({ params }: PageProps) {
@@ -34,6 +148,13 @@ export default function TemplateBuilder({ params }: PageProps) {
   const [targetRegion, setTargetRegion] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // DND Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const loadData = useCallback(async () => {
     if (!templateId) return;
@@ -108,6 +229,65 @@ export default function TemplateBuilder({ params }: PageProps) {
     setWidgets(newWidgets);
   };
 
+  const updateWidgetTitle = (index: number, title: string) => {
+    const newWidgets = [...widgets];
+    newWidgets[index].display_title = title;
+    setWidgets(newWidgets);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent, regionName: string) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    // Splits widgets per region en niet-region
+    const regionWidgets = widgets
+      .map((w, i) => ({ ...w, originalIndex: i }))
+      .filter(w => w.region === regionName);
+    
+    const otherWidgets = widgets
+      .map((w, i) => ({ ...w, originalIndex: i }))
+      .filter(w => w.region !== regionName);
+
+    const oldIndex = regionWidgets.findIndex(w => w.originalIndex.toString() === active.id);
+    const newIndex = regionWidgets.findIndex(w => w.originalIndex.toString() === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder de widgets binnen deze region
+    const reorderedRegionWidgets = arrayMove(regionWidgets, oldIndex, newIndex);
+    
+    // Merge terug: andere regions blijven op hun plek
+    const newWidgets = [...otherWidgets, ...reorderedRegionWidgets]
+      .sort((a, b) => {
+        // Sort eerst op region (left, main, right) en dan op volgorde binnen region
+        const regionOrder = { left_sidebar: 0, main_content: 1, right_sidebar: 2 };
+        const regionDiff = (regionOrder[a.region as keyof typeof regionOrder] || 0) - 
+                          (regionOrder[b.region as keyof typeof regionOrder] || 0);
+        if (regionDiff !== 0) return regionDiff;
+        
+        // Binnen dezelfde region: gebruik de nieuwe index uit reorderedRegionWidgets
+        if (a.region === regionName && b.region === regionName) {
+          const aIdx = reorderedRegionWidgets.findIndex(w => w.originalIndex === a.originalIndex);
+          const bIdx = reorderedRegionWidgets.findIndex(w => w.originalIndex === b.originalIndex);
+          return aIdx - bIdx;
+        }
+        return a.originalIndex - b.originalIndex;
+      })
+      .map((w, idx) => ({
+        ...w,
+        sort_order: idx
+      }))
+      .map(({ originalIndex, ...rest }) => rest); // Remove originalIndex helper property
+    
+    setWidgets(newWidgets as WidgetInstance[]);
+  };
+
   const renderRegion = (regionName: string, title: string, colSpan: string) => {
     const regionWidgets = widgets
         .map((w, i) => ({ ...w, originalIndex: i }))
@@ -125,57 +305,36 @@ export default function TemplateBuilder({ params }: PageProps) {
                 </button>
             </div>
 
-            <div className="bg-slate-100/50 p-4 rounded-[2.5rem] min-h-[200px] space-y-4 border-2 border-dashed border-slate-200">
-                {regionWidgets.map((w) => (
-                    <div key={w.originalIndex} className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm group">
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-3">
-                                <Move size={14} className="text-slate-300 cursor-move" />
-                                <div>
-                                    <input 
-                                        className="font-black text-sm text-slate-900 bg-transparent outline-none focus:text-blue-600 placeholder:text-slate-300"
-                                        placeholder={w.definition?.name}
-                                        value={w.display_title}
-                                        onChange={(e) => {
-                                            const nw = [...widgets];
-                                            nw[w.originalIndex].display_title = e.target.value;
-                                            setWidgets(nw);
-                                        }}
-                                    />
-                                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">
-                                        Bron: {w.definition?.name}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex gap-1">
-                                <button 
-                                    onClick={() => router.push(`/ui-config/widgets/${w.widget_definition_id}`)}
-                                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all"
-                                    title="Open Architect"
-                                >
-                                    <Settings2 size={16} />
-                                </button>
-                                <button onClick={() => removeWidget(w.originalIndex)} className="p-2 text-slate-300 hover:text-rose-500 rounded-full">
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Live Blauwdruk</span>
-                             </div>
-                             <button 
-                                onClick={() => router.push(`/ui-config/widgets/${w.widget_definition_id}`)}
-                                className="text-[9px] font-black text-blue-600 flex items-center gap-1 hover:underline"
-                             >
-                                CONFIG <ExternalLink size={10} />
-                             </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={(e) => handleDragEnd(e, regionName)}
+            >
+              <div className="bg-slate-100/50 p-4 rounded-[2.5rem] min-h-[200px] space-y-4 border-2 border-dashed border-slate-200">
+                <SortableContext
+                  items={regionWidgets.map(w => w.originalIndex.toString())}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {regionWidgets.map((w) => (
+                    <SortableWidget
+                      key={w.originalIndex}
+                      widget={w}
+                      index={w.originalIndex}
+                      onUpdate={updateWidgetTitle}
+                      onRemove={removeWidget}
+                      router={router}
+                    />
+                  ))}
+                </SortableContext>
+                
+                {regionWidgets.length === 0 && (
+                  <div className="text-center py-12 text-slate-300 text-xs italic">
+                    Sleep widgets hierheen of klik "+ TOEVOEGEN"
+                  </div>
+                )}
+              </div>
+            </DndContext>
         </div>
     )
   };

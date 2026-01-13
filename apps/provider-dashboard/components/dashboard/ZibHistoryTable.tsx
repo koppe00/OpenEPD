@@ -5,10 +5,11 @@ import { ClinicalObservation } from '@/hooks/useClinicalData';
 import { FileText, Calendar } from 'lucide-react';
 
 interface Props {
+  zibId: string;
   history: ClinicalObservation[];
 }
 
-export function ZibHistoryTable({ history }: Props) {
+export function ZibHistoryTable({ zibId, history }: Props) {
   if (!history || history.length === 0) {
     return <div className="p-8 text-center text-slate-400 italic text-xs">Geen historie beschikbaar.</div>;
   }

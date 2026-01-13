@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { ClinicalObservation } from './useClinicalData';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // 1. Strictere Types (Geen 'any' meer)
 export interface ProtocolAction {
@@ -36,10 +37,7 @@ export function useProtocolEngine(observations: ClinicalObservation[] | undefine
   const [loading, setLoading] = useState(true);
 
   // Supabase client declareren we buiten de effect, maar gebruiken we erin
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase: SupabaseClient = getSupabaseBrowserClient();
 
   useEffect(() => {
     // 2. Logic verplaatst naar binnenin useEffect (voorkomt hoisting & dep issues)
@@ -52,7 +50,7 @@ export function useProtocolEngine(observations: ClinicalObservation[] | undefine
 
       setLoading(true);
 
-      const { data: allRules } = await supabase
+      const result = await supabase
         .from('protocol_rules')
         .select(`
           id,
@@ -67,6 +65,8 @@ export function useProtocolEngine(observations: ClinicalObservation[] | undefine
         `)
         .eq('protocol.is_active', true)
         .returns<DBProtocolRule[]>(); // Type assertion voor Supabase response
+
+      const { data: allRules } = result;
 
       if (!allRules) {
         setLoading(false);
@@ -87,7 +87,7 @@ export function useProtocolEngine(observations: ClinicalObservation[] | undefine
         const match = observations.find(obs => {
           if (obs.zib_id !== condition.zib) return false;
           
-          const contentString = JSON.stringify(obs.content).toLowerCase();
+          const contentString = JSON.stringify(obs.value).toLowerCase();
           const valueString = condition.value.toLowerCase();
           
           return contentString.includes(valueString);

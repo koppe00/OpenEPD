@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { 
   User, X, MapPin, Phone, Mail, 
   ShieldAlert, FolderLock, ExternalLink, Loader2, Save, Fingerprint, CheckCircle2
@@ -20,10 +20,7 @@ export function PatientRegistrationModal({ isOpen, onClose, patientId, onSuccess
   const [saving, setSaving] = useState(false);
   const [hasRelationship, setHasRelationship] = useState<boolean>(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
     if (!isOpen || !patientId) return;
@@ -90,12 +87,12 @@ export function PatientRegistrationModal({ isOpen, onClose, patientId, onSuccess
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-0 sm:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative w-full max-w-4xl bg-[#F8FAFC] rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+      <div className="relative w-full h-full sm:h-auto max-h-[90vh] sm:max-w-4xl bg-[#F8FAFC] rounded-none sm:rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
         {/* Header */}
-        <div className="p-8 bg-white border-b border-slate-100 flex justify-between items-center">
+        <div className="p-6 sm:p-8 bg-white border-b border-slate-100 flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Fingerprint size={14} className="text-blue-500" />
@@ -105,7 +102,7 @@ export function PatientRegistrationModal({ isOpen, onClose, patientId, onSuccess
               {loading ? 'Laden...' : patient?.full_name}
             </h2>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
+          <button onClick={onClose} className="p-4 sm:p-3 hover:bg-slate-100 rounded-2xl transition-all">
             <X size={20} />
           </button>
         </div>
@@ -159,25 +156,25 @@ export function PatientRegistrationModal({ isOpen, onClose, patientId, onSuccess
                    <input className="w-full p-4 bg-slate-50 rounded-xl text-sm font-black text-slate-900" value={patient.email || ''} placeholder="E-mail" onChange={(e) => handleUpdateField('email', e.target.value)} />
                 </section>
 
-                <div className="mt-auto">
+                 <div className="mt-auto">
                    {!hasRelationship ? (
-                      <button onClick={handleEstablishRelationship} className="w-full bg-amber-500 text-white p-6 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-amber-900/20">
-                        Bevestig Relatie & Open Dossier
-                      </button>
+                     <button onClick={handleEstablishRelationship} className="w-full bg-amber-500 text-white p-6 sm:p-5 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-amber-900/20">
+                      Bevestig Relatie & Open Dossier
+                     </button>
                    ) : (
-                      <button onClick={() => onSuccess(patient)} className="w-full bg-emerald-600 text-white p-6 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2">
-                        <FolderLock size={16} /> Open Dossier
-                      </button>
+                     <button onClick={() => onSuccess(patient)} className="w-full bg-emerald-600 text-white p-6 sm:p-5 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2">
+                      <FolderLock size={16} /> Open Dossier
+                     </button>
                    )}
-                </div>
+                 </div>
               </div>
             </div>
           )}
         </div>
         
         {/* Footer */}
-        <div className="p-8 bg-white border-t border-slate-100 flex justify-end">
-          <button onClick={saveChanges} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg">
+        <div className="p-4 sm:p-8 bg-white border-t border-slate-100 flex justify-end">
+          <button onClick={saveChanges} className="bg-slate-900 text-white px-8 py-6 sm:py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg">
              <Save size={16} /> Gegevens Opslaan
           </button>
         </div>

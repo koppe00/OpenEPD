@@ -1,5 +1,5 @@
 // Groep: Workflow Architectuur - Nictiz 2024 Context-aware
-export type WorkflowMode = 'spreekuur' | 'kliniek' | 'spoed' | 'afdeling';
+import type { WorkflowMode } from '../types/work-context';
 
 export interface WorkflowContext {
   mode: WorkflowMode;

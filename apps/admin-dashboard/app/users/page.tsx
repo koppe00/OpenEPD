@@ -40,7 +40,7 @@ export default function GebruikersBeheer() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [subTab, setSubTab] = useState('matrix');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const [stats, setStats] = useState({
     totalStaff: 0,
@@ -83,7 +83,7 @@ export default function GebruikersBeheer() {
 
   const tabs = [
     { id: 'dashboard', label: 'Overzicht', icon: LayoutDashboard },
-    { id: 'beheer', label: 'Beheeraccounts', icon: Shield }, // <--- Nieuwe tab
+    { id: 'beheer', label: 'Beheeraccounts', icon: Shield },
     { id: 'gebruikers', label: 'Zorgverleners', icon: Users },
     { id: 'patiënten', label: 'Patiënten', icon: Fingerprint },
     { id: 'workflow', label: 'Workflows', icon: Zap },
@@ -146,8 +146,6 @@ export default function GebruikersBeheer() {
   )}
 
   {activeTab === 'patiënten' && <PatientSupportView patients={patients || []} loading={patientsLoading} />}
-
-        {activeTab === 'patiënten' && <PatientSupportView patients={patients || []} loading={patientsLoading} />}
         
         {activeTab === 'workflow' && <WorkflowManager />}
 

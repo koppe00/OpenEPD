@@ -25,7 +25,7 @@ export function useUsers() {
     const [pRes, oRes, rRes, lRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('*, staff_memberships(organization_id, organizations(name))')
+        .select('*, user_organizations(organization_id, organizations(name))')
             // We zoeken specifiek naar mensen die GEEN patiënt zijn
             .or('is_patient.eq.false,is_patient.is.null') 
             .order('last_name'),
@@ -58,7 +58,7 @@ export function useUsers() {
 const saveUser = async (formData: any, authOptions: any, userId?: string) => {
   try {
     // 1. Haal organisatie_id eruit, dit hoort niet in de 'profiles' tabel
-    const { organization_id, staff_memberships, ...profileDataOnly } = formData;
+    const { organization_id, user_organizations, ...profileDataOnly } = formData;
 
     if (userId || formData.id) {
       const finalId = userId || formData.id;
@@ -76,7 +76,7 @@ const saveUser = async (formData: any, authOptions: any, userId?: string) => {
       // Update organisatie koppeling in de APARTE tabel
       if (organization_id) {
         await supabase
-          .from('staff_memberships')
+          .from('user_organizations')
           .upsert({
             user_id: finalId,
             organization_id: organization_id

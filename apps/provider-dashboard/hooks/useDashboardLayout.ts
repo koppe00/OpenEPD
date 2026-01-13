@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 // Interfaces
 export interface WidgetSection {
@@ -35,11 +35,22 @@ export interface DashboardWidget {
 }
 
 interface UseDashboardLayoutProps {
-  careSetting: 'polyclinic' | 'clinical' | 'admin';
-  specialtyCode: string;
+  workContextId: string; // NEW: Direct work_context_id from active context
+  specialtyId?: string | null; // Optional specialty filter
+  userId: string; // Required for permission checking
+  // DEPRECATED: Legacy props for backwards compatibility
+  careSetting?: 'polyclinic' | 'clinical' | 'admin';
+  specialtyCode?: string;
 }
 
-export function useDashboardLayout({ careSetting, specialtyCode }: UseDashboardLayoutProps) {
+export function useDashboardLayout({ 
+  workContextId, 
+  specialtyId, 
+  userId,
+  // Legacy fallback
+  careSetting,
+  specialtyCode 
+}: UseDashboardLayoutProps) {
   const [loading, setLoading] = useState(true);
   
   const [leftWidgets, setLeftWidgets] = useState<DashboardWidget[]>([]);
@@ -50,45 +61,49 @@ export function useDashboardLayout({ careSetting, specialtyCode }: UseDashboardL
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState<string>('');
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
-  // 1. Haal beschikbare templates op (Ongewijzigd)
+  // 1. Fetch available templates - FILTERED BY WORK CONTEXT (NEW ARCHITECTURE)
   useEffect(() => {
     async function fetchTemplates() {
       setLoading(true);
-      const { data: context } = await supabase
-        .from('ui_contexts')
-        .select('id')
-        .eq('care_setting', careSetting)
-        .eq('specialty_code', specialtyCode)
-        .single();
+      
+      // NEW: Use get_user_templates() function for unified filtering
+      const { data: userTemplates, error } = await supabase
+        .rpc('get_user_templates', { p_user_id: userId });
 
-      if (context) {
-        const { data: templates } = await supabase
-          .from('ui_templates')
-          .select('id, name')
-          .eq('context_id', context.id)
-          .eq('is_active', true)
-          .order('name');
-
-        if (templates && templates.length > 0) {
-          setAvailableTemplates(templates);
-          setActiveTemplateId(prev => {
-            const exists = templates.find(t => t.id === prev);
-            return exists ? prev : templates[0].id;
-          });
-        } else {
-          setAvailableTemplates([]);
-          setActiveTemplateId(null);
-        }
+      if (error) {
+        console.error('Error fetching user templates:', error);
+        setAvailableTemplates([]);
+        setActiveTemplateId(null);
+        setLoading(false);
+        return;
       }
+
+      if (userTemplates && userTemplates.length > 0) {
+        // Map to simpler format
+        const templates = userTemplates.map((t: any) => ({
+          id: t.template_id,
+          name: t.template_name,
+        }));
+        
+        setAvailableTemplates(templates);
+        setActiveTemplateId(prev => {
+          const exists = templates.find((t: any) => t.id === prev);
+          return exists ? prev : templates[0].id;
+        });
+      } else {
+        setAvailableTemplates([]);
+        setActiveTemplateId(null);
+      }
+      
       setLoading(false);
     }
-    fetchTemplates();
-  }, [careSetting, specialtyCode, supabase]);
+    
+    if (userId && workContextId) {
+      fetchTemplates();
+    }
+  }, [workContextId, specialtyId, userId, supabase]);
 
   // 2. Haal widgets op (AANGEPAST: DEEP SELECT)
   useEffect(() => {
@@ -145,9 +160,6 @@ export function useDashboardLayout({ careSetting, specialtyCode }: UseDashboardL
             }
             return w;
         });
-        
-        // Console check om te zien of je data nu binnenkomt
-        console.log("🔥 Live Architecture Data:", processedWidgets);
 
         // Verdeel over de kolommen
         setLeftWidgets(processedWidgets.filter(w => w.region === 'left_sidebar'));

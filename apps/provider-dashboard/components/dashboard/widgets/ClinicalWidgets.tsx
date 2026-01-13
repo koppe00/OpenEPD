@@ -21,7 +21,7 @@ export const VitalsWidget = ({ observations }: { observations: ClinicalObservati
       .filter(o => o.zib_id === code)
       .sort((a, b) => new Date(b.effective_at).getTime() - new Date(a.effective_at).getTime())[0];
     
-    return found ? (found.content as VitalContent) : null; 
+    return found ? (found.value as VitalContent) : null; 
   };
 
   const bp = getLatest('nl.zorg.Bloeddruk'); 
@@ -42,38 +42,38 @@ export const VitalsWidget = ({ observations }: { observations: ClinicalObservati
   };
 
   return (
-    <DashboardWidget title="Vitale Parameters" icon={Activity} iconColor="bg-rose-500" className="h-48">
-      <div className="grid grid-cols-3 gap-4 h-full">
+    <DashboardWidget title="Vitale Parameters" icon={Activity} iconColor="bg-rose-600">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {/* Bloeddruk */}
-        <div className="bg-rose-50 rounded-xl p-3 flex flex-col justify-between">
-           <div className="flex items-center gap-2 text-rose-300 mb-1">
-             <Activity size={16} /> <span className="text-[10px] font-black uppercase">Tensie</span>
+        <div className="bg-rose-50 border border-rose-200 rounded p-2 flex flex-col justify-between">
+           <div className="flex items-center gap-1 text-rose-400 mb-1">
+             <Activity size={12} /> <span className="text-[9px] font-extrabold uppercase">Tensie</span>
            </div>
-           <div>
-              <span className="text-2xl font-black text-rose-900">{displayValue(bp)}</span>
-              <span className="text-[10px] text-rose-400 ml-1">mmHg</span>
+           <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-rose-900">{displayValue(bp)}</span>
+              <span className="text-[8px] font-bold text-rose-500">mmHg</span>
            </div>
         </div>
         
         {/* Hartslag */}
-        <div className="bg-blue-50 rounded-xl p-3 flex flex-col justify-between">
-           <div className="flex items-center gap-2 text-blue-300 mb-1">
-             <Heart size={16} /> <span className="text-[10px] font-black uppercase">Pols</span>
+        <div className="bg-blue-50 border border-blue-200 rounded p-2 flex flex-col justify-between">
+           <div className="flex items-center gap-1 text-blue-400 mb-1">
+             <Heart size={12} /> <span className="text-[9px] font-extrabold uppercase">Pols</span>
            </div>
-           <div>
-              <span className="text-2xl font-black text-blue-900">{displayValue(hr)}</span>
-              <span className="text-[10px] text-blue-400 ml-1">/min</span>
+           <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-blue-900">{displayValue(hr)}</span>
+              <span className="text-[8px] font-bold text-blue-500">/min</span>
            </div>
         </div>
 
         {/* Temperatuur */}
-        <div className="bg-emerald-50 rounded-xl p-3 flex flex-col justify-between">
-           <div className="flex items-center gap-2 text-emerald-300 mb-1">
-             <Thermometer size={16} /> <span className="text-[10px] font-black uppercase">Temp</span>
+        <div className="bg-emerald-50 border border-emerald-200 rounded p-2 flex flex-col justify-between">
+           <div className="flex items-center gap-1 text-emerald-400 mb-1">
+             <Thermometer size={12} /> <span className="text-[9px] font-extrabold uppercase">Temp</span>
            </div>
-           <div>
-              <span className="text-2xl font-black text-emerald-900">{displayValue(temp)}</span>
-              <span className="text-[10px] text-emerald-400 ml-1">°C</span>
+           <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-emerald-900">{displayValue(temp)}</span>
+              <span className="text-[8px] font-bold text-emerald-500">°C</span>
            </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export const ResultsWidget = ({ observations }: { observations: ClinicalObservat
       <div className="space-y-0 divide-y divide-slate-50">
          {labs.length > 0 ? labs.map((lab) => {
            // Veilige access tot content
-           const content = lab.content as VitalContent;
+           const content = lab.value as VitalContent;
            return (
              <div key={lab.id} className="py-3 flex justify-between items-center group cursor-pointer hover:bg-slate-50 px-2 -mx-2 rounded-lg transition-colors">
                 <div className="flex items-center gap-3">

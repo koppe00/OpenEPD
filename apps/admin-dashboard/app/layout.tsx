@@ -20,8 +20,8 @@ export default function RootLayout({
       <body className={`${inter.className} flex h-screen overflow-hidden bg-slate-50`}>
         <AdminSidebar />
         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <main className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-7xl mx-auto pb-20">
+          <main className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-[1920px] mx-auto pb-12">
               {children}
             </div>
           </main>

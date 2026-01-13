@@ -25,27 +25,29 @@ export const DashboardWidget = ({
   noPadding = false
 }: Props) => {
   return (
-    <div className={`bg-white border border-slate-200 shadow-sm rounded-2xl flex flex-col overflow-hidden ${className}`}>
+    <div className={`bg-white border border-slate-300 shadow-sm rounded-lg flex flex-col overflow-hidden ${className}`}>
       
       {/* Compacte Header: Zakelijk & Strak */}
-      <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 min-h-[48px]">
-        <div className="flex items-center gap-2.5">
-          <div className={`p-1.5 rounded-lg text-white shadow-sm ${iconColor}`}>
-            <Icon size={14} strokeWidth={2.5} />
+      <div className="px-2 sm:px-3 py-2 border-b-2 border-blue-600 bg-gradient-to-r from-blue-50 to-white">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+          <div className={`p-1 rounded text-white ${iconColor}`}>
+            <Icon size={12} strokeWidth={2.5} />
           </div>
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-600">
+          <h3 className="text-[10px] font-extrabold uppercase tracking-wide text-slate-700">
             {title}
           </h3>
-        </div>
-        {action && (
-          <div className="text-slate-400 hover:text-slate-600 transition-colors">
-            {action}
           </div>
-        )}
+          {action && (
+            <div className="w-full sm:w-auto mt-2 sm:mt-0 text-slate-400 hover:text-slate-600 transition-colors flex justify-end">
+              {action}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content Area */}
-      <div className={`flex-1 overflow-y-auto custom-scrollbar ${noPadding ? '' : 'p-4'}`}>
+      <div className={`flex-1 overflow-y-auto custom-scrollbar ${noPadding ? '' : 'p-2 sm:p-3'}`}>
         {children}
       </div>
     </div>

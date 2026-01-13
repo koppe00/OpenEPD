@@ -1,0 +1,5 @@
+{
+  "orderECG": "http://localhost:4001/webhook/order-ecg",
+  "planPCI": "http://localhost:4001/webhook/plan-pci",
+  "intakeTask": "http://localhost:4001/webhook/intake"
+}

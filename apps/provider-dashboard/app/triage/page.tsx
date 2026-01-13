@@ -1,18 +1,30 @@
 // apps/provider-dashboard/app/triage/page.tsx
 
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-// De Next.js component moet de Supabase client aanmaken
-// Dit is de meest betrouwbare manier om de environment variabelen te lezen in Next.js
-// Let op: De Supabase client hier gebruikt de ANONYMOUS key (read-only)
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_ANON_KEY!;
+// Helper function to create server-side Supabase client
+async function getSupabaseServerClient() {
+  const cookieStore = await cookies();
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Supabase environment variables zijn niet geladen in Next.js');
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set(name, value, options);
+        },
+        remove(name: string, options: any) {
+          cookieStore.set(name, '', { ...options, maxAge: 0 });
+        },
+      },
+    }
+  );
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Interfaces voor de Triage Data
 interface VitalsRecord {
@@ -25,6 +37,8 @@ interface VitalsRecord {
 // Data fetching functie: Haalt kritieke data op uit de CQRS Query Store
 async function fetchTriageData(): Promise<VitalsRecord[]> {
   const CRITICAL_THRESHOLD = 120; // Gebaseerd op de Triage Agent logica
+
+  const supabase = await getSupabaseServerClient();
 
   // Query de vitals_read_store direct
   const { data, error } = await supabase

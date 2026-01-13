@@ -7,7 +7,7 @@ import {
   ChevronLeft, Loader2, ShieldCheck, AlertCircle, Save,
   Search, ExternalLink, Calendar, HeartPulse, Phone
 } from 'lucide-react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { GENDER_OPTIONS, NAME_USE_OPTIONS, COUNTRY_OPTIONS } from '../../../config/codelists';
 
 // --- STYLING ---
@@ -25,10 +25,7 @@ const UZOVI_MAP: Record<string, string> = {
 
 export function PatientRegistrationWidget() {
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   // State
   const [step, setStep] = useState(1);

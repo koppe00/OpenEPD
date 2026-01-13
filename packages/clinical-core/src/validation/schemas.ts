@@ -1068,5 +1068,27 @@ export const NarratieveVerslaglegging = {
     progress_note: z.string().describe("Decursus tekst"),
     contact_type: z.enum(['visit', 'call', 'email', 'e-consult']).default('visit').describe("Contact Type"),
     author: z.string().optional().describe("Auteur")
+  }),
+
+  // 6. POLIKLINISCH CONSULT (2e lijns - Compleet)
+  'nl.zorg.PoliklinischConsult': z.object({
+    anamnese: z.string().describe("Anamnese - Klachten, voorgeschiedenis"),
+    lichamelijk_onderzoek: z.string().describe("Lichamelijk Onderzoek - Bevindingen"),
+    aanvullend_onderzoek: z.string().optional().describe("Aanvullend Onderzoek - Labs, imaging"),
+    conclusie: z.string().describe("Conclusie - Diagnose en interpretatie"),
+    beleid: z.string().describe("Beleid - Behandelplan en follow-up"),
+    specialisme: z.string().describe("Specialisme - Vakgebied"),
+    contact_type: z.enum(['Eerste poliklinisch consult', 'Vervolg consult', 'Dagbehandeling', 'Telefonisch consult']).default('Eerste poliklinisch consult').describe("Type Contact"),
+    consult_date: z.string().datetime().optional().describe("Consult Datum")
+  }),
+
+  // 7. DBC DECLARATIE (Financiële administratie)
+  'nl.zorg.DBCDeclaratie': z.object({
+    dbc_code: z.string().optional().describe("DBC Code"),
+    care_type: z.string().optional().describe("Zorgtype - bijv. Eerste consult, Vervolg"),
+    icd10_codes: z.array(z.string()).optional().describe("ICD-10 Codes"),
+    procedures: z.array(z.string()).optional().describe("Verrichtingen"),
+    consult_date: z.string().datetime().optional().describe("Datum"),
+    duration_minutes: z.number().optional().describe("Duur in minuten")
   })
 };

@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { 
   ArrowLeft, Save, Trash2, 
   Layout, Code2, Eye, List, Table as TableIcon, BarChart3,
-  Loader2, Plus, Settings2, Info, Type
+  Loader2, Plus, Settings2, Info, Type, ChevronRight
 } from 'lucide-react';
 import { ZIB_CONFIG } from '@openepd/clinical-core';
 

@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, ShieldCheck, LogOut, Activity, Database, Wifi, WifiOff } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
+import { ContextSwitcher } from './ContextSwitcher';
 
-export function AdminHeader({ title }: { title: string }) {
+export function AdminHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   const [isOnline, setIsOnline] = useState(true);
   const [dbStatus, setDbStatus] = useState<'connected' | 'error'>('connected');
+  const [userId, setUserId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,6 +27,15 @@ export function AdminHeader({ title }: { title: string }) {
   };
 
   useEffect(() => {
+    // Haal de huidige gebruiker op
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    fetchUser();
+
     // Check status bij laden en elke 30 seconden
     checkHealth();
     const interval = setInterval(checkHealth, 30000);
@@ -53,11 +64,18 @@ export function AdminHeader({ title }: { title: string }) {
         <div className="w-1.5 h-8 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.4)]" />
         <div>
           <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">{title}</h1>
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">OpenEPD Beheeromgeving</p>
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{subtitle || 'OpenEPD Beheeromgeving'}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Context Switcher */}
+        {userId && (
+          <div className="pr-4 border-r border-slate-100">
+            <ContextSwitcher userId={userId} />
+          </div>
+        )}
+
         {/* Real-time Status Indicators */}
         <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
           {/* Netwerk Status */}

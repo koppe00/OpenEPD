@@ -13,8 +13,9 @@ import {
   Database, 
   Cpu,
   LayoutTemplate,
-  Component, // Nieuwe import voor het widget icoon
-  Network // Voor layouts/algemeen
+  Component,
+  Network,
+  BookOpen // Voor referentiedata
 } from 'lucide-react';
 
 const menuItems = [
@@ -28,12 +29,16 @@ const menuItems = [
   {
     category: 'Inrichting & UI',
     items: [
-      // 1. Hier heb ik de link aangepast naar de templates pagina die we gefixt hebben
       { label: 'Dashboard Templates', href: '/ui-config/templates', icon: LayoutTemplate },
-      // 2. Deze is nieuw: Direct naar de Widget Architect
       { label: 'Widget Architect', href: '/ui-config/widgets', icon: Component },
       { label: 'Protocollen (GLM)', href: '/clinical/protocols', icon: Stethoscope },
-      { label: 'Documentatie', href: '/documentation/templates', icon: FileText },
+      { label: 'Documentatie', href: '/documentation', icon: FileText },
+    ]
+  },
+  {
+    category: 'Referentiedata',
+    items: [
+      { label: 'Stamtabellen', href: '/reference-data', icon: BookOpen },
     ]
   },
   {

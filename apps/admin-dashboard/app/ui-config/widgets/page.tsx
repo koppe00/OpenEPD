@@ -57,6 +57,13 @@ export default function WidgetList() {
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
+      <div className="bg-yellow-100 border-l-4 border-yellow-400 p-4 rounded-xl mb-6">
+        <p className="text-yellow-800 font-bold text-sm">
+          ⚠️ De widget builder is nog <span className="underline">under construction</span>.<br />
+          Het <span className="font-mono">engine_type</span> veld moet voorlopig <span className="font-mono">handmatig</span> in de database worden aangepast voor correcte werking in de frontend.
+        </p>
+      </div>
+
       <header className="flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Widget Register</h1>

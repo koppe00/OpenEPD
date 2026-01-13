@@ -2,11 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { XCircle, User, Shield, MapPin, Save, Fingerprint, Mail, Key } from 'lucide-react';
+import { UserContextAssignment } from './context/UserContextAssignment';
+import { useContexts } from '../../hooks/useContexts';
 
 export function UserModal({ isOpen, onClose, onSave, selectedUser, organizations, roles, mode }: any) {
   const [authMethod, setAuthMethod] = useState<'invite' | 'manual'>('invite');
   const [tempPassword, setTempPassword] = useState('');
   const [activeTab, setActiveTab] = useState('basis');
+  
+  const {
+    specialisms,
+    groups,
+    workContexts,
+    roles: availableRoles,
+    organizations: availableOrganizations,
+    loading: contextsLoading,
+    fetchUserContexts,
+    saveUserContexts
+  } = useContexts();
   
   const [formData, setFormData] = useState<any>({
     first_name: '',
@@ -46,10 +59,10 @@ export function UserModal({ isOpen, onClose, onSave, selectedUser, organizations
 
   const tabs = [
     { id: 'basis', label: 'Basis Info', icon: User },
-    { id: 'prof', label: 'Professioneel', icon: Shield },
     // Alleen tonen als het geen beheerder is
-  ...(mode !== 'admin' ? [{ id: 'prof', label: 'Professioneel', icon: Shield }] : []),
-      { id: 'adres', label: 'Adres & Contact', icon: MapPin },
+    ...(mode !== 'admin' ? [{ id: 'prof', label: 'Professioneel', icon: Shield }] : []),
+    { id: 'adres', label: 'Adres & Contact', icon: MapPin },
+    ...(selectedUser ? [{ id: 'contexten', label: 'Contexten', icon: Shield }] : []),
   ];
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,7 +77,7 @@ export function UserModal({ isOpen, onClose, onSave, selectedUser, organizations
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
         
         {/* Header */}
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -75,6 +88,19 @@ export function UserModal({ isOpen, onClose, onSave, selectedUser, organizations
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
               Beheer dossiergegevens en toegangsrechten
             </p>
+            {/* ID Info voor debugging/admins */}
+            {selectedUser && (
+              <div className="mt-2 flex gap-4 text-[9px] font-mono text-slate-400">
+                <span title="Profile ID (voor context koppelingen)">
+                  <span className="text-slate-500">Profile:</span> {selectedUser.id?.substring(0, 8)}...
+                </span>
+                {selectedUser.auth_user_id && selectedUser.auth_user_id !== selectedUser.id && (
+                  <span title="Auth User ID (afwijkend - legacy data)" className="text-amber-500">
+                    <span className="text-amber-600">Auth:</span> {selectedUser.auth_user_id?.substring(0, 8)}... ⚠️
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <button onClick={onClose} className="text-slate-300 hover:text-slate-900 transition-colors">
             <XCircle size={28} />
@@ -217,6 +243,26 @@ export function UserModal({ isOpen, onClose, onSave, selectedUser, organizations
                 <input className="w-full px-6 py-4 bg-slate-50 rounded-2xl border-none font-bold text-sm" value={formData.address_city || ''} onChange={e => setFormData({...formData, address_city: e.target.value})} />
               </div>
             </div>
+          )}
+
+          {activeTab === 'contexten' && selectedUser && (
+            <UserContextAssignment
+              userId={selectedUser.id}
+              availableRoles={availableRoles}
+              availableSpecialisms={specialisms}
+              availableOrganizations={availableOrganizations}
+              availableGroups={groups}
+              availableWorkContexts={workContexts}
+              fetchUserContexts={fetchUserContexts}
+              onSave={async (contexts) => {
+                try {
+                  await saveUserContexts(selectedUser.id, contexts);
+                  alert('Contexten succesvol opgeslagen!');
+                } catch (error: any) {
+                  alert('Fout bij opslaan: ' + error.message);
+                }
+              }}
+            />
           )}
 
           <div className="mt-8 pt-8 border-t border-slate-100 flex gap-4">

@@ -6,3 +6,46 @@ node_modules
 .env.production.local
 .next
 FuntioneelOntwerp.md
+FuntioneelOntwerpBeheerPortaal.md
+supabase_schema.md
+mappenstructruur uitlezen.md
+
+
+# VS Code & devcontainer
+.vscode/
+.devcontainer/
+
+# Turbo/Build cache
+.turbo/
+
+# Logfiles
+*.log
+
+dev-server.log
+
+# Oude configs, backups, tijdelijke bestanden
+*.old
+*.bak
+*.tmp
+*.tsold
+*.jsold
+
+# Test- en debug scripts
+*.sh
+*.sql
+!20260113_schema.sql
+!20260113_seed.sql
+
+# Node.js build artifacts
+/ts-node
+/agent-services@1.0.0
+
+# Package manager lockfiles (indien pnpm gebruikt)
+package-lock.json
+
+# Supabase config (indien secrets bevat)
+supabase/config.toml
+
+# Markdown bestanden
+*.md
+!DEPLOYMENT_STEPS.md

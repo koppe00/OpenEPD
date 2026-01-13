@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { Lock, Database, Info, Settings, CheckCircle2, Loader2 } from 'lucide-react';
 import { ZIB_CONFIG } from '@openepd/clinical-core';
 import { ClinicalObservation } from '@/hooks/useClinicalData';
@@ -44,10 +44,7 @@ export const SmartTemplateEditor = ({
   const [saving, setSaving] = useState(false);
   const router = useRouter();
   
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  const supabase = getSupabaseBrowserClient();
 
   // 2. Synchroniseer secties wanneer layoutSections (uit de database join) binnenkomt
 
@@ -206,58 +203,55 @@ useEffect(() => {
     );
   }
   return (
-    <div className={`flex flex-col bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden ${embedded ? 'h-full' : ''}`}>
-      {/* Header */}
-      <div className="p-4 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center px-8">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-blue-600"><Lock size={14} /></div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 italic">Smart Editor</span>
+    <div className={`flex flex-col bg-white rounded-md border border-slate-200 overflow-hidden ${embedded ? 'h-full' : ''}`}>
+      {/* Header - ultra compact */}
+      <div className="px-2 py-1 border-b border-slate-100 bg-slate-50 flex justify-between items-center min-h-[28px]">
+        <div className="flex items-center gap-1">
+          <Lock size={10} className="text-blue-600" />
+          <span className="text-[8px] font-bold uppercase tracking-wide text-slate-500">Smart Editor</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
            {showSuccess && (
-             <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase animate-in fade-in slide-in-from-right-4">
-               <CheckCircle2 size={14} /> Opgeslagen
-             </div>
+             <span className="flex items-center gap-0.5 text-emerald-500 font-bold text-[8px] uppercase"><CheckCircle2 size={10} /> Opgeslagen</span>
            )}
-           <span className="text-[8px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full uppercase">Live Sync</span>
+           <span className="text-[7px] font-bold text-emerald-500 bg-emerald-50 px-1 py-0.5 rounded">Live Sync</span>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-16 custom-scrollbar">
-          {sections.length > 0 ? sections.map((section) => (
-            <div key={section.id} className="relative">
-              {/* We gebruiken de rijke renderer die inzicht & invoer combineert */}
-              <SectionDataRenderer 
-                key={section.id} 
-                  section={section} 
-                  observations={observations} // Zorg dat dit de volledige array van 41 stuks is
-                  patientId={patientId}
-                  onDataChange={onSaveSuccess}
-                  mode="journal"
-                    />
-                  </div>
-                )) : (
-            <div className="h-full flex flex-col items-center justify-center text-center py-20">
-              <Settings size={32} className="text-slate-200 mb-4" />
-              <p className="text-xs font-bold text-slate-400 uppercase">Geen secties geconfigureerd</p>
-            </div>
-          )}
-        </div>
+      {/* Content - ultra compact, minimale witruimte */}
+      <div className="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar">
+        {sections.length > 0 ? sections.map((section) => (
+          <div key={section.id} className="relative border-b border-slate-100 last:border-b-0">
+            <SectionDataRenderer 
+              key={section.id} 
+              section={section} 
+              observations={observations}
+              patientId={patientId}
+              onDataChange={onSaveSuccess}
+              mode="journal"
+            />
+          </div>
+        )) : (
+          <div className="h-full flex flex-col items-center justify-center text-center py-4">
+            <Settings size={18} className="text-slate-200 mb-1" />
+            <p className="text-[9px] font-bold text-slate-400 uppercase">Geen secties geconfigureerd</p>
+          </div>
+        )}
+      </div>
 
-{/* Footer */}
-      <div className="p-6 border-t border-slate-50 bg-white px-8 flex justify-end gap-3">
-         <button className="px-6 py-3 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Concept</button>
-         <button 
-            onClick={handleSave} 
-            disabled={saving}
-            className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-xl ${
-              showSuccess ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-blue-600'
-            }`}
-         >
-            {saving ? <Loader2 className="animate-spin" size={14} /> : showSuccess ? <CheckCircle2 size={14} /> : <CheckCircle2 size={14} />}
-            {saving ? 'Verwerken...' : showSuccess ? 'Gepubliceerd' : 'Valideren & Publiceren'}
-         </button>
+      {/* Footer - ultra compact */}
+      <div className="px-2 py-1 border-t border-slate-100 bg-white flex justify-end gap-1">
+        <button className="px-2 py-1 rounded text-[8px] font-bold uppercase text-slate-400 hover:text-slate-600">Concept</button>
+        <button 
+          onClick={handleSave} 
+          disabled={saving}
+          className={`px-3 py-1 rounded font-bold text-[8px] uppercase tracking-wide flex items-center gap-0.5 shadow ${
+            showSuccess ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-blue-600'
+          }`}
+        >
+          {saving ? <Loader2 className="animate-spin" size={10} /> : <CheckCircle2 size={10} />}
+          {saving ? 'Verwerken...' : showSuccess ? 'Gepubliceerd' : 'Valideren & Publiceren'}
+        </button>
       </div>
     </div>
   );

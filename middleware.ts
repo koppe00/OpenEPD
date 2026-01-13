@@ -71,14 +71,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Beperk middleware tot de belangrijke frontends: provider-dashboard, admin-dashboard en patient-portal
   matcher: [
-    /*
-     * Match alle verzoeken behalve:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - alle bestanden met een extensie (svg, png, etc.)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/provider-dashboard/:path*',
+    '/admin-dashboard/:path*',
+    '/patient-portal/:path*',
+    // Zorg dat login en auth callbacks ook gematcht worden
+    '/login',
+    '/auth/:path*',
   ],
 }

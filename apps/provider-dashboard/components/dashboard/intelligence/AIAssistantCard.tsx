@@ -19,7 +19,7 @@ interface ClinicalObservation {
   id: string;
   zib_id: string; 
   effective_at: string;
-  content: ZibContent;
+  value: ZibContent; // Changed from 'content' to match useClinicalData
 }
 
 interface AIAssistantProps {
@@ -39,14 +39,14 @@ export const AIAssistantCard = ({ observations = [], mode = 'spreekuur' }: AIAss
   };
 
   // Type-safe extractie
-  const latestBP = observations.find(o => o.zib_id === 'nl.zorg.Bloeddruk')?.content;
+  const latestBP = observations.find(o => o.zib_id === 'nl.zorg.Bloeddruk')?.value;
   const allergies = observations.filter(o => o.zib_id === 'nl.zorg.AllergieIntolerantie');
   
   const systolicValue = latestBP?.systolic ?? 0;
   const diastolicValue = latestBP?.diastolic ?? 0;
   
   const isHypertensive = systolicValue > 140 || diastolicValue > 90;
-  const hasCriticalAllergy = allergies.some(a => a.content?.criticality === 'High');
+  const hasCriticalAllergy = allergies.some(a => a.value?.criticality === 'High');
 
   return (
     <div className="bg-slate-900 text-white p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden group min-h-[340px] flex flex-col justify-between">

@@ -11,11 +11,14 @@ export const VitalsTrendChart = ({ observations }: Props) => {
   // Filter alleen bloeddruk metingen en draai om voor chronologische volgorde
   const bpData = observations
     .filter(o => o.zib_id === 'nl.zorg.Bloeddruk')
-    .map(o => ({
-      time: new Date(o.timestamp).toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
-      systolic: o.systolic,
-      diastolic: o.diastolic,
-    }))
+    .map(o => {
+      const val = o.value as any;
+      return {
+        time: new Date(o.effective_at).toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' }),
+        systolic: val?.systolic,
+        diastolic: val?.diastolic,
+      };
+    })
     .reverse();
 
   if (bpData.length === 0) return null;
